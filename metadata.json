@@ -1,0 +1,6 @@
+{
+  "name": "THIRTEEN PROJECT - Automotive Care & Pre-Owned Cars",
+  "description": "Layanan profesional auto detailing, nano coating, upgrade lampu Biled, cuci mobil premium, dan jual beli mobil bekas berkualitas di Langkat, Sumatera Utara.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
