@@ -43,12 +43,12 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F0F11] text-white flex flex-col selection:bg-[#D4AF37] selection:text-black">
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#0F0F11] text-white flex flex-col selection:bg-[#D4AF37] selection:text-black">
       {/* Fixed Luxury Header */}
       <Navbar onOpenBooking={() => handleOpenBooking()} />
 
       {/* Main Content Sections */}
-      <main className="flex-grow">
+      <main className="flex-grow w-full overflow-x-hidden">
         {/* 1. Hero Section */}
         <Hero onOpenBooking={() => handleOpenBooking()} />
 

@@ -15,7 +15,7 @@ import {
   Calculator,
   Share2
 } from "lucide-react";
-import { CarUnit, generateCarWhatsAppLink, DISPLAY_PHONE } from "../data/carsData";
+import { CarUnit, generateCarWhatsAppLink } from "../data/carsData";
 
 interface CarDetailModalProps {
   car: CarUnit | null;
@@ -84,17 +84,20 @@ export default function CarDetailModal({ car, onClose }: CarDetailModalProps) {
   return (
     <div
       id="car-detail-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 lg:p-6 bg-black/90 backdrop-blur-md overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 lg:p-6 bg-black/90 backdrop-blur-md pb-[env(safe-area-inset-bottom,0px)] animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
         id="car-detail-container"
         onClick={(e) => e.stopPropagation()}
-        className="bg-[#15161A] border border-[#2D313A] max-w-5xl w-full overflow-hidden relative shadow-2xl my-auto text-white"
+        className="bg-[#15161A] border border-[#2D313A] max-w-5xl w-full max-h-[92dvh] sm:max-h-[90vh] overflow-hidden relative shadow-2xl my-auto text-white rounded-t-2xl sm:rounded-none flex flex-col animate-in slide-in-from-bottom-5 sm:slide-in-from-bottom-0 duration-300"
       >
+        {/* Mobile Drag Pill */}
+        <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mt-2.5 sm:hidden shrink-0"></div>
+
         {/* Header Bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#121215]">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-white/10 bg-[#121215] shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3">
             <span className="text-[10px] font-mono tracking-[0.2em] uppercase font-bold text-black bg-[#D4AF37] px-2.5 py-1">
               {car.badge}
             </span>
@@ -103,18 +106,18 @@ export default function CarDetailModal({ car, onClose }: CarDetailModalProps) {
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <button
               onClick={handleCopyShare}
               title="Bagikan Unit Mobil"
-              className="p-2 text-neutral-400 hover:text-[#D4AF37] transition-colors text-xs flex items-center gap-1"
+              className="min-w-[44px] min-h-[44px] p-2 text-neutral-400 hover:text-[#D4AF37] transition-colors text-xs flex items-center justify-center gap-1 cursor-pointer"
             >
               <Share2 className="w-4 h-4" />
               <span className="hidden sm:inline">{copiedLink ? "Tersalin!" : "Share"}</span>
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-neutral-400 hover:text-white transition-colors cursor-pointer"
+              className="min-w-[44px] min-h-[44px] p-2 text-neutral-400 hover:text-white transition-colors cursor-pointer flex items-center justify-center"
               aria-label="Tutup modal unit"
             >
               <X className="w-6 h-6" />
@@ -362,13 +365,13 @@ export default function CarDetailModal({ car, onClose }: CarDetailModalProps) {
                   <label className="text-xs text-neutral-400 block mb-1">
                     Tenor Pembiayaan:
                   </label>
-                  <div className="grid grid-cols-4 gap-1">
+                  <div className="grid grid-cols-4 gap-1.5">
                     {[12, 24, 36, 48].map((t) => (
                       <button
                         key={t}
                         type="button"
                         onClick={() => setTenorMonths(t)}
-                        className={`text-xs py-1.5 border transition-colors ${
+                        className={`text-xs min-h-[42px] py-2 border transition-colors flex items-center justify-center cursor-pointer ${
                           tenorMonths === t
                             ? "bg-[#D4AF37] text-black border-[#D4AF37] font-semibold"
                             : "border-white/10 text-neutral-300 hover:border-white/30"
@@ -393,33 +396,33 @@ export default function CarDetailModal({ car, onClose }: CarDetailModalProps) {
             </div>
 
             {/* ACTION CTA ROW */}
-            <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 pb-[env(safe-area-inset-bottom,0px)]">
               <a
                 href={whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 id="btn-modal-wa-avail"
-                className="w-full sm:w-auto px-8 py-4 bg-[#D4AF37] hover:bg-[#E5C05B] text-black font-semibold text-xs sm:text-sm tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg shadow-[#D4AF37]/10 transition-all duration-200"
+                className="w-full sm:w-auto min-h-[48px] px-6 sm:px-8 py-3.5 sm:py-4 bg-[#D4AF37] hover:bg-[#E5C05B] text-black font-semibold text-xs sm:text-sm tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg shadow-[#D4AF37]/10 transition-all duration-200 active:scale-[0.99]"
               >
-                <MessageCircle className="w-5 h-5" />
-                <span>TANYA AVAILABILITY VIA WHATSAPP</span>
+                <MessageCircle className="w-5 h-5 shrink-0" />
+                <span>TANYA AVAILABILITY VIA WA</span>
               </a>
 
-              <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto justify-end">
                 <a
                   href={`https://wa.me/6282272777421?text=${encodeURIComponent(
                     `Halo THIRTEEN PROJECT, saya ingin booking jadwal inspeksi langsung / test drive untuk unit ${car.name} (${car.formattedPrice}).`
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full sm:w-auto px-5 py-4 border border-white/20 hover:border-[#D4AF37] text-white hover:text-[#D4AF37] font-medium text-xs tracking-wider uppercase text-center transition-colors"
+                  className="w-full sm:w-auto min-h-[46px] px-5 py-3 sm:py-4 border border-white/20 hover:border-[#D4AF37] text-white hover:text-[#D4AF37] font-medium text-xs tracking-wider uppercase flex items-center justify-center text-center transition-colors active:bg-white/5"
                 >
                   Jadwalkan Test Drive
                 </a>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="hidden sm:block px-4 py-4 text-xs text-neutral-400 hover:text-white uppercase tracking-wider"
+                  className="min-h-[44px] px-4 py-3 sm:py-4 text-xs text-neutral-400 hover:text-white uppercase tracking-wider cursor-pointer border border-white/10 sm:border-transparent text-center"
                 >
                   Tutup
                 </button>

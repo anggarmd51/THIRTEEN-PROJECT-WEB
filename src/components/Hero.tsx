@@ -1,4 +1,4 @@
-import { ArrowUpRight, MessageSquare, ChevronDown } from "lucide-react";
+import { ArrowUpRight, MessageSquare, ChevronDown, Calendar } from "lucide-react";
 import { generateServiceWhatsAppLink } from "../data/carsData";
 
 interface HeroProps {
@@ -11,7 +11,7 @@ export default function Hero({ onOpenBooking }: HeroProps) {
   return (
     <section
       id="beranda"
-      className="relative min-h-screen flex flex-col justify-between pt-28 pb-12 overflow-hidden bg-[#0F0F11]"
+      className="relative min-h-[92vh] sm:min-h-screen flex flex-col justify-between pt-[calc(5.5rem+env(safe-area-inset-top,0px))] sm:pt-28 md:pt-32 pb-8 sm:pb-12 overflow-hidden bg-[#0F0F11]"
     >
       {/* Background Car Imagery with Dark Dramatic Vignette */}
       <div className="absolute inset-0 z-0 pointer-events-none">
@@ -26,18 +26,18 @@ export default function Hero({ onOpenBooking }: HeroProps) {
       </div>
 
       {/* Main Hero Content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full flex-1 flex flex-col justify-center my-auto">
-        <div className="max-w-4xl space-y-6">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full flex-1 flex flex-col justify-center my-auto py-6 sm:py-10">
+        <div className="max-w-4xl space-y-4 sm:space-y-6">
           {/* Small Tagline */}
-          <div className="inline-flex items-center gap-3">
-            <span className="w-8 h-[1px] bg-[#D4AF37]"></span>
-            <span className="text-xs sm:text-sm font-semibold tracking-[0.25em] text-[#D4AF37] uppercase">
+          <div className="inline-flex items-center gap-2.5 sm:gap-3">
+            <span className="w-6 sm:w-8 h-[1px] bg-[#D4AF37]"></span>
+            <span className="text-[11px] sm:text-sm font-semibold tracking-[0.2em] sm:tracking-[0.25em] text-[#D4AF37] uppercase">
               EST. 2024 • LANGKAT, SUMATERA UTARA
             </span>
           </div>
 
           {/* Main Headline */}
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-light text-white tracking-tight leading-[1.08]">
+          <h1 className="text-3xl sm:text-5xl lg:text-7xl font-light text-white tracking-tight leading-[1.12]">
             Perawatan Otomotif{" "}
             <span className="font-serif-accent text-[#D4AF37] font-normal italic inline-block">
               Terbaik
@@ -49,21 +49,32 @@ export default function Hero({ onOpenBooking }: HeroProps) {
           </h1>
 
           {/* Subtitle */}
-          <p className="max-w-2xl text-base sm:text-lg text-neutral-400 font-light leading-relaxed">
+          <p className="max-w-2xl text-sm sm:text-base lg:text-lg text-neutral-400 font-light leading-relaxed">
             Layanan profesional auto detailing, upgrade lampu Biled, cuci mobil premium, dan jual-beli mobil pilihan terverifikasi.
           </p>
 
-          {/* CTA Buttons */}
-          <div className="pt-2 flex flex-wrap items-center gap-4 sm:gap-5">
+          {/* CTA Buttons - Full-width stacked on mobile for comfortable tap targets */}
+          <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
             {/* Primary Solid Gold Button */}
             <a
               href="#katalog-mobil"
               id="hero-btn-stok-mobil"
-              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-[#D4AF37] hover:bg-[#E5C05B] text-black font-semibold text-xs sm:text-sm tracking-wider uppercase transition-all duration-200 shadow-lg shadow-[#D4AF37]/10"
+              className="inline-flex items-center justify-center gap-2 min-h-[48px] px-6 py-3 bg-[#D4AF37] hover:bg-[#E5C05B] active:bg-[#C9A430] text-black font-semibold text-xs sm:text-sm tracking-wider uppercase transition-all duration-200 shadow-lg shadow-[#D4AF37]/10"
             >
               <span>LIHAT STOK MOBIL</span>
               <ArrowUpRight className="w-4 h-4" />
             </a>
+
+            {/* Direct Booking Modal Button */}
+            <button
+              type="button"
+              onClick={onOpenBooking}
+              id="hero-btn-booking-modal"
+              className="inline-flex items-center justify-center gap-2 min-h-[48px] px-6 py-3 border border-[#D4AF37]/70 hover:border-[#D4AF37] active:bg-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/10 font-medium text-xs sm:text-sm tracking-wider uppercase transition-all duration-200 cursor-pointer"
+            >
+              <Calendar className="w-4 h-4 text-[#D4AF37]" />
+              <span>RESERVASI ONLINE</span>
+            </button>
 
             {/* Secondary Outline WhatsApp Button */}
             <a
@@ -71,10 +82,10 @@ export default function Hero({ onOpenBooking }: HeroProps) {
               target="_blank"
               rel="noopener noreferrer"
               id="hero-btn-booking-wa"
-              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 border border-white/20 hover:border-[#D4AF37] text-white hover:text-[#D4AF37] bg-white/[0.02] hover:bg-white/[0.05] font-medium text-xs sm:text-sm tracking-wider uppercase transition-all duration-200"
+              className="inline-flex items-center justify-center gap-2 min-h-[48px] px-5 py-3 border border-white/20 hover:border-[#D4AF37] active:bg-white/10 text-white hover:text-[#D4AF37] bg-white/[0.02] hover:bg-white/[0.05] font-medium text-xs sm:text-sm tracking-wider uppercase transition-all duration-200"
             >
               <MessageSquare className="w-4 h-4 text-[#D4AF37]" />
-              <span>BOOKING SERVIS (WA)</span>
+              <span>WHATSAPP</span>
             </a>
           </div>
         </div>

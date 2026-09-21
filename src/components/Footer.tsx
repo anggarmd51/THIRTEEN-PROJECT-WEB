@@ -1,4 +1,4 @@
-import { MapPin, Clock, Phone, MessageCircle, Instagram, ArrowUpRight } from "lucide-react";
+import { MapPin, Clock, MessageCircle, Instagram, ArrowUpRight } from "lucide-react";
 import { STORE_ADDRESS, OPERATING_HOURS, DISPLAY_PHONE, WHATSAPP_PHONE } from "../data/carsData";
 import Logo from "./Logo";
 
@@ -6,22 +6,22 @@ export default function Footer() {
   const googleMapsUrl = "https://maps.app.goo.gl/FiNCUMjYxHHfMWK78";
 
   return (
-    <footer id="kontak" className="bg-[#0A0A0C] text-neutral-400 border-t border-[#1C1E23] pt-16 pb-28 sm:pb-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+    <footer id="kontak" className="bg-[#0A0A0C] text-neutral-400 border-t border-[#1C1E23] pt-12 sm:pt-16 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] sm:pb-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 sm:space-y-12">
         {/* Top Header Row */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pb-10 border-b border-white/10">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pb-8 sm:pb-10 border-b border-white/10">
           {/* Logo */}
           <a href="#" className="flex items-center shrink-0 transition-opacity hover:opacity-90">
-            <Logo className="h-9 sm:h-11 w-auto max-w-[220px] sm:max-w-[280px]" />
+            <Logo className="h-14 sm:h-16 md:h-20 lg:h-24 w-auto max-w-[340px] sm:max-w-[380px] md:max-w-[420px]" />
           </a>
 
           {/* Social Links */}
           <div className="flex items-center gap-6 text-xs uppercase tracking-wider">
             <a
-              href="https://instagram.com"
+              href="https://www.instagram.com/rinaldiagustiraaa_?stkn=YnVvcmRsOHFzazJ4"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 hover:text-[#D4AF37] transition-colors"
+              className="min-h-[44px] inline-flex items-center gap-2 hover:text-[#D4AF37] transition-colors py-2"
             >
               <Instagram className="w-4 h-4 text-[#D4AF37]" />
               <span>Instagram</span>
@@ -30,7 +30,7 @@ export default function Footer() {
               href={`https://wa.me/${WHATSAPP_PHONE}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 hover:text-[#D4AF37] transition-colors"
+              className="min-h-[44px] inline-flex items-center gap-2 hover:text-[#D4AF37] transition-colors py-2"
             >
               <MessageCircle className="w-4 h-4 text-[#D4AF37]" />
               <span>WhatsApp</span>
@@ -55,10 +55,10 @@ export default function Footer() {
               href={googleMapsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[11px] text-[#D4AF37] hover:underline uppercase tracking-wider font-medium pt-1"
+              className="min-h-[44px] inline-flex items-center gap-1.5 text-[11px] text-[#D4AF37] hover:underline uppercase tracking-wider font-medium pt-1"
             >
               <span>Buka Petunjuk Arah Google Maps</span>
-              <ArrowUpRight className="w-3 h-3" />
+              <ArrowUpRight className="w-3.5 h-3.5" />
             </a>
           </div>
 
@@ -71,7 +71,7 @@ export default function Footer() {
               <Clock className="w-4 h-4 text-[#D4AF37] shrink-0 mt-0.5" />
               <div className="space-y-1 text-xs text-neutral-400 font-light">
                 <p>
-                  <strong className="text-white font-medium">Senin — Sabtu:</strong> 09.00 — 18.00 WIB
+                  <strong className="text-white font-medium">{OPERATING_HOURS}</strong>
                 </p>
                 <p className="text-neutral-500">
                   <strong className="text-neutral-400">Minggu:</strong> Khusus Reservasi &amp; Janji Temu

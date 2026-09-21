@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 
 export const CAR_STORAGE_BUCKET = "car-photos";
+export const PORTFOLIO_STORAGE_BUCKET = "portfolio-photos";
 
 export interface UploadResult {
   url: string;
@@ -17,20 +18,37 @@ export async function uploadCarImage(
   file: File,
   folder = "cars"
 ): Promise<UploadResult> {
+  return uploadToBucket(file, CAR_STORAGE_BUCKET, folder);
+}
+
+/**
+ * Uploads a portfolio image file to Supabase Storage bucket.
+ */
+export async function uploadPortfolioImage(
+  file: File,
+  folder = "portfolio"
+): Promise<UploadResult> {
+  return uploadToBucket(file, PORTFOLIO_STORAGE_BUCKET, folder);
+}
+
+async function uploadToBucket(
+  file: File,
+  bucketName: string,
+  folder: string
+): Promise<UploadResult> {
   const fileExt = file.name.split(".").pop() || "jpg";
   const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
 
   try {
     const { data, error } = await supabase.storage
-      .from(CAR_STORAGE_BUCKET)
+      .from(bucketName)
       .upload(fileName, file, {
         cacheControl: "3600",
         upsert: true,
       });
 
     if (error) {
-      console.warn("Supabase Storage upload warning (fallback to local base64):", error.message);
-      // Fallback: convert to base64 so user can immediately preview and save without hard blockers
+      console.warn(`Supabase Storage (${bucketName}) upload warning:`, error.message);
       const base64Url = await fileToBase64(file);
       return {
         url: base64Url,
@@ -42,7 +60,7 @@ export async function uploadCarImage(
     // Get public URL
     const {
       data: { publicUrl },
-    } = supabase.storage.from(CAR_STORAGE_BUCKET).getPublicUrl(data.path);
+    } = supabase.storage.from(bucketName).getPublicUrl(data.path);
 
     return {
       url: publicUrl,
@@ -80,3 +98,4 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = (error) => reject(error);
   });
 }
+
