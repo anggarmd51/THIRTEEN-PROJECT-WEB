@@ -296,15 +296,12 @@ export default function CarDetailModal({ car, onClose }: CarDetailModalProps) {
                 </p>
 
                 {/* 100% Quality Seal */}
-                <div className="p-4 bg-[#111215] border border-[#D4AF37]/30 flex items-start gap-3 mt-4">
-                  <ShieldCheck className="w-6 h-6 text-[#D4AF37] shrink-0 mt-0.5" />
+                <div className="p-4 bg-[#111215] border border-[#D4AF37]/30 flex items-center gap-3 mt-4">
+                  <ShieldCheck className="w-6 h-6 text-[#D4AF37] shrink-0" />
                   <div>
                     <span className="text-xs font-semibold uppercase tracking-wider text-white block">
                       GARANSI STANDAR THIRTEEN PROJECT
                     </span>
-                    <p className="text-xs text-neutral-400 font-light mt-1">
-                      Setiap unit mobil pilihan telah melalui inspeksi komprehensif 150+ titik. Dijamin 100% bukan bekas tabrakan fatal struktur rangka, bukan bekas banjir, dan keaslian kilometer dijamin sah.
-                    </p>
                   </div>
                 </div>
               </div>

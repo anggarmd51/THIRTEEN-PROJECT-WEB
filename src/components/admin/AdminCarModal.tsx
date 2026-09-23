@@ -1,7 +1,69 @@
-import React, { useRef, useState } from "react";
-import { X, Upload, Camera, PlusCircle, Trash, Check, AlertCircle, Sparkles } from "lucide-react";
+import React, { useRef, useState, useEffect } from "react";
+import {
+  X,
+  Upload,
+  Camera,
+  PlusCircle,
+  Trash,
+  Check,
+  AlertCircle,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Move,
+} from "lucide-react";
 import { CarFormData, GalleryPhotoItem } from "../../types";
 import { insertCarToSupabase, updateCarInSupabase } from "../../lib/supabaseDb";
+import { uploadCarImage } from "../../lib/storage";
+
+export const GALLERY_SLOTS = [
+  { id: 1, label: "Depan" },
+  { id: 2, label: "Belakang" },
+  { id: 3, label: "Samping Kanan" },
+  { id: 4, label: "Samping Kiri" },
+  { id: 5, label: "Dashboard" },
+  { id: 6, label: "Interior 1" },
+  { id: 7, label: "Interior 2" },
+  { id: 8, label: "Mesin" },
+  { id: 9, label: "Foto Tambahan 1" },
+  { id: 10, label: "Foto Tambahan 2" },
+] as const;
+
+function build10SlotsFromGallery(gallery: GalleryPhotoItem[] | undefined): (GalleryPhotoItem | null)[] {
+  const slots: (GalleryPhotoItem | null)[] = Array(10).fill(null);
+  if (!gallery || !Array.isArray(gallery) || gallery.length === 0) {
+    return slots;
+  }
+
+  const unplaced: GalleryPhotoItem[] = [];
+  gallery.forEach((item) => {
+    if (!item || !item.url) return;
+    const tagLower = (item.tag || item.title || "").toLowerCase().trim();
+    const slotIdx = GALLERY_SLOTS.findIndex(
+      (s) => s.label.toLowerCase() === tagLower || `galeri ${s.label.toLowerCase()}` === tagLower
+    );
+    if (slotIdx !== -1 && slots[slotIdx] === null) {
+      slots[slotIdx] = { ...item, tag: GALLERY_SLOTS[slotIdx].label };
+    } else {
+      unplaced.push(item);
+    }
+  });
+
+  let unplacedIdx = 0;
+  for (let i = 0; i < 10 && unplacedIdx < unplaced.length; i++) {
+    if (slots[i] === null) {
+      const item = unplaced[unplacedIdx++];
+      slots[i] = {
+        ...item,
+        tag: GALLERY_SLOTS[i].label,
+        title: item.title || `Foto ${GALLERY_SLOTS[i].label}`,
+      };
+    }
+  }
+
+  return slots;
+}
 
 interface AdminCarModalProps {
   isOpen: boolean;
@@ -75,12 +137,191 @@ export default function AdminCarModal({
 }: AdminCarModalProps) {
   const mainImageInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const batchInputRef = useRef<HTMLInputElement>(null);
+  const singleSlotInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [internalLoading, setInternalLoading] = useState(false);
 
+  // 10-Slot Gallery States
+  const [gallerySlots, setGallerySlots] = useState<(GalleryPhotoItem | null)[]>(() =>
+    build10SlotsFromGallery(carFormData.gallery)
+  );
+  const [uploadingSlotIndex, setUploadingSlotIndex] = useState<number | null>(null);
+  const [isBatchUploading, setIsBatchUploading] = useState(false);
+  const [draggedSlotIndex, setDraggedSlotIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // Sync slots when modal opens or editingCarId changes
+  useEffect(() => {
+    if (isOpen) {
+      setGallerySlots(build10SlotsFromGallery(carFormData.gallery));
+    }
+  }, [isOpen, editingCarId]);
+
+  // Sync slots to parent carFormData.gallery
+  const syncSlotsToFormData = (newSlots: (GalleryPhotoItem | null)[]) => {
+    setGallerySlots(newSlots);
+    const activePhotos: GalleryPhotoItem[] = [];
+    newSlots.forEach((slot, idx) => {
+      if (slot && slot.url && slot.url.trim()) {
+        activePhotos.push({
+          url: slot.url.trim(),
+          title: slot.title || `${carFormData.name || "Unit"} - ${GALLERY_SLOTS[idx].label}`,
+          tag: GALLERY_SLOTS[idx].label,
+        });
+      }
+    });
+    setCarFormData((prev) => ({
+      ...prev,
+      gallery: activePhotos,
+    }));
+  };
+
+  // Remove photo from specific slot (triggered by Red 'X' Button)
+  const handleRemoveSlotPhoto = (slotIndex: number) => {
+    const updated = [...gallerySlots];
+    updated[slotIndex] = null;
+    syncSlotsToFormData(updated);
+  };
+
+  // Swap / reorder slots
+  const handleSwapSlots = (indexA: number, indexB: number) => {
+    if (indexA < 0 || indexA >= 10 || indexB < 0 || indexB >= 10 || indexA === indexB) return;
+    const updated = [...gallerySlots];
+    const temp = updated[indexA];
+    updated[indexA] = updated[indexB];
+    updated[indexB] = temp;
+
+    if (updated[indexA]) {
+      updated[indexA] = {
+        ...updated[indexA]!,
+        tag: GALLERY_SLOTS[indexA].label,
+        title: `${carFormData.name || "Unit"} - ${GALLERY_SLOTS[indexA].label}`,
+      };
+    }
+    if (updated[indexB]) {
+      updated[indexB] = {
+        ...updated[indexB]!,
+        tag: GALLERY_SLOTS[indexB].label,
+        title: `${carFormData.name || "Unit"} - ${GALLERY_SLOTS[indexB].label}`,
+      };
+    }
+
+    syncSlotsToFormData(updated);
+  };
+
+  // Single Slot Upload Handler
+  const handleSlotFileChange = async (slotIndex: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingSlotIndex(slotIndex);
+    try {
+      const result = await uploadCarImage(file, `cars/gallery`);
+      if (result.error) {
+        console.warn("[Upload Warning]", result.error);
+      }
+      const updated = [...gallerySlots];
+      updated[slotIndex] = {
+        url: result.url,
+        tag: GALLERY_SLOTS[slotIndex].label,
+        title: `${carFormData.name || "Unit"} - ${GALLERY_SLOTS[slotIndex].label}`,
+      };
+      syncSlotsToFormData(updated);
+    } catch (err: any) {
+      console.error("[Slot Upload Error]", err);
+      alert(`Gagal mengunggah foto slot ${GALLERY_SLOTS[slotIndex].label}: ${err.message || "Kesalahan jaringan"}`);
+    } finally {
+      setUploadingSlotIndex(null);
+      e.target.value = "";
+    }
+  };
+
+  // Batch Multi-Upload Handler (Fills empty slots in 1..10 order)
+  const handleBatchGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const emptyIndices: number[] = [];
+    gallerySlots.forEach((slot, idx) => {
+      if (slot === null || !slot.url) {
+        emptyIndices.push(idx);
+      }
+    });
+
+    if (emptyIndices.length === 0) {
+      alert("Semua 10 slot galeri telah terisi. Silakan hapus foto pada slot yang ingin diganti terlebih dahulu.");
+      e.target.value = "";
+      return;
+    }
+
+    setIsBatchUploading(true);
+    try {
+      const updated = [...gallerySlots];
+      const filesToProcess = files.slice(0, emptyIndices.length);
+
+      for (let i = 0; i < filesToProcess.length; i++) {
+        const file = filesToProcess[i];
+        const targetSlotIndex = emptyIndices[i];
+        const res = await uploadCarImage(file, "cars/gallery");
+        updated[targetSlotIndex] = {
+          url: res.url,
+          tag: GALLERY_SLOTS[targetSlotIndex].label,
+          title: `${carFormData.name || "Unit"} - ${GALLERY_SLOTS[targetSlotIndex].label}`,
+        };
+      }
+
+      syncSlotsToFormData(updated);
+
+      if (files.length > emptyIndices.length) {
+        alert(
+          `Berhasil mengisi ${emptyIndices.length} slot kosong. (${files.length - emptyIndices.length} foto berlebih diabaikan karena galeri dibatasi tepat 10 slot).`
+        );
+      }
+    } catch (err: any) {
+      console.error("[Batch Upload Error]", err);
+      alert(`Gagal mengunggah galeri: ${err.message || "Kesalahan jaringan"}`);
+    } finally {
+      setIsBatchUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  // Drag-and-Drop Handlers
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedSlotIndex(index);
+    e.dataTransfer.setData("text/plain", String(index));
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = (index: number) => {
+    if (dragOverIndex === index) {
+      setDragOverIndex(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    const sourceIndex = draggedSlotIndex ?? parseInt(e.dataTransfer.getData("text/plain"), 10);
+    if (!isNaN(sourceIndex) && sourceIndex !== targetIndex) {
+      handleSwapSlots(sourceIndex, targetIndex);
+    }
+    setDraggedSlotIndex(null);
+    setDragOverIndex(null);
+  };
+
   if (!isOpen) return null;
 
-  const isSaving = internalLoading || externalSubmitting;
+  const isSaving = internalLoading || externalSubmitting || isBatchUploading;
+  const filledSlotsCount = gallerySlots.filter((s) => Boolean(s && s.url)).length;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,9 +345,26 @@ export default function AdminCarModal({
     setInternalLoading(true);
 
     try {
+      // Build active gallery sequence
+      const activePhotos: GalleryPhotoItem[] = [];
+      gallerySlots.forEach((slot, idx) => {
+        if (slot && slot.url && slot.url.trim()) {
+          activePhotos.push({
+            url: slot.url.trim(),
+            title: slot.title || `${carFormData.name || "Unit"} - ${GALLERY_SLOTS[idx].label}`,
+            tag: GALLERY_SLOTS[idx].label,
+          });
+        }
+      });
+
+      const payloadFormData: CarFormData = {
+        ...carFormData,
+        gallery: activePhotos,
+      };
+
       if (editingCarId) {
         // Mode EDIT: Update ke Supabase
-        const { error: updateError } = await updateCarInSupabase(editingCarId, carFormData);
+        const { error: updateError } = await updateCarInSupabase(editingCarId, payloadFormData);
         if (updateError) {
           throw updateError;
         }
@@ -114,7 +372,7 @@ export default function AdminCarModal({
         alert("Unit berhasil diperbarui!");
       } else {
         // Mode TAMBAH: Insert baru ke Supabase
-        const { error: insertError } = await insertCarToSupabase(carFormData);
+        const { error: insertError } = await insertCarToSupabase(payloadFormData);
         if (insertError) {
           throw insertError;
         }
@@ -128,6 +386,7 @@ export default function AdminCarModal({
 
         // Reset form data ke default
         setCarFormData(DEFAULT_RESET_DATA);
+        setGallerySlots(Array(10).fill(null));
 
         // Notifikasi popup alert sesuai permintaan user
         alert("Unit berhasil ditambahkan!");
@@ -536,65 +795,203 @@ export default function AdminCarModal({
               </div>
             </div>
 
-            {/* Additional Gallery Multi-Upload */}
-            <div className="pt-3 border-t border-white/5 space-y-3">
-              <div className="flex items-center justify-between">
+            {/* Additional Gallery - 10 Structured Slots */}
+            <div className="pt-4 border-t border-white/10 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-300">
-                    Galeri Foto Tambahan (Multi-Upload)
-                  </label>
-                  <p className="text-[11px] text-neutral-400 font-light">
-                    Unggah foto sudut lain (interior, mesin, samping, belakang, speedometer).
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-200 font-semibold">
+                      Galeri Foto Unit (Tepat 10 Slot Sudut Pengambilan)
+                    </label>
+                    <span className="text-[10px] font-mono text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 border border-[#D4AF37]/30">
+                      {filledSlotsCount} / 10 Slot Terisi
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 font-light mt-1">
+                    Susun foto sesuai 10 sudut standar. Setiap thumbnail memiliki tombol 'X' merah untuk hapus, dan dapat digeser posisinya (drag & drop atau tombol panah) agar pas dengan label.
                   </p>
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  ref={galleryInputRef}
-                  onChange={onGalleryUpload}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  disabled={isUploadingGallery || isSaving}
-                  onClick={() => galleryInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/20 hover:border-[#D4AF37] text-white hover:text-[#D4AF37] uppercase text-[11px] font-mono transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  <span>{isUploadingGallery ? "Mengunggah..." : "+ Tambah Galeri"}</span>
-                </button>
+
+                {/* Batch multi-upload button */}
+                <div className="shrink-0">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    ref={batchInputRef}
+                    onChange={handleBatchGalleryUpload}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    disabled={isBatchUploading || isSaving}
+                    onClick={() => batchInputRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#D4AF37] bg-[#D4AF37]/10 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-black uppercase text-[11px] font-mono font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {isBatchUploading ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Mengunggah...</span>
+                      </>
+                    ) : (
+                      <>
+                        <PlusCircle className="w-3.5 h-3.5" />
+                        <span>+ Unggah Sekaligus (Multi)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
-              {/* Gallery Thumbnails List */}
-              {carFormData.gallery.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5 pt-2">
-                  {carFormData.gallery.map((photo, idx) => (
-                    <div key={idx} className="relative group border border-white/10 bg-black h-20 overflow-hidden">
-                      <img
-                        src={photo.url}
-                        alt={photo.title}
-                        className="w-full h-full object-cover"
+              {/* 10 Slots Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 pt-1">
+                {GALLERY_SLOTS.map((slotInfo, index) => {
+                  const photo = gallerySlots[index];
+                  const isUploadingThis = uploadingSlotIndex === index;
+                  const isDragTarget = dragOverIndex === index;
+                  const isDraggedSource = draggedSlotIndex === index;
+
+                  return (
+                    <div
+                      key={slotInfo.id}
+                      className={`flex flex-col rounded bg-[#101114] border transition-all ${
+                        isDragTarget
+                          ? "border-[#D4AF37] ring-2 ring-[#D4AF37]/50 bg-[#D4AF37]/5"
+                          : photo
+                          ? "border-white/20 hover:border-white/40"
+                          : "border-white/10 hover:border-[#D4AF37]/40"
+                      } ${isDraggedSource ? "opacity-40" : ""}`}
+                    >
+                      {/* Slot Header Label */}
+                      <div className="px-2.5 py-1.5 bg-[#141519] border-b border-white/5 flex items-center justify-between gap-1">
+                        <span className="text-[10px] font-mono font-semibold tracking-wider text-neutral-300 truncate">
+                          {slotInfo.id}. {slotInfo.label}
+                        </span>
+                        {photo ? (
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" title="Foto Terisi" />
+                        ) : (
+                          <span className="text-[9px] font-mono text-neutral-500 shrink-0">Kosong</span>
+                        )}
+                      </div>
+
+                      {/* Hidden File Input for this single slot */}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        ref={(el) => {
+                          singleSlotInputRefs.current[index] = el;
+                        }}
+                        onChange={(e) => handleSlotFileChange(index, e)}
+                        className="hidden"
                       />
-                      <span className="absolute bottom-0 left-0 right-0 bg-black/80 text-[9px] text-center text-neutral-300 py-0.5 truncate px-1">
-                        {photo.tag}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => onRemoveGalleryPhoto(idx)}
-                        className="absolute top-1 right-1 p-1 bg-red-600/80 hover:bg-red-600 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                        title="Hapus foto ini"
+
+                      {/* Slot Body Area */}
+                      <div
+                        className="relative h-28 sm:h-32 bg-black flex flex-col justify-center items-center overflow-hidden"
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDragLeave={() => handleDragLeave(index)}
+                        onDrop={(e) => handleDrop(e, index)}
                       >
-                        <Trash className="w-3 h-3" />
-                      </button>
+                        {isUploadingThis ? (
+                          <div className="flex flex-col items-center justify-center p-2 text-center text-[#D4AF37]">
+                            <Loader2 className="w-5 h-5 animate-spin mb-1" />
+                            <span className="text-[9px] font-mono">Mengunggah...</span>
+                          </div>
+                        ) : photo && photo.url ? (
+                          <div
+                            draggable={true}
+                            onDragStart={(e) => handleDragStart(e, index)}
+                            className="relative w-full h-full group cursor-grab active:cursor-grabbing"
+                            title="Tarik/Drag untuk tukar posisi, atau gunakan tombol panah"
+                          >
+                            <img
+                              src={photo.url}
+                              alt={slotInfo.label}
+                              className="w-full h-full object-cover select-none pointer-events-none"
+                            />
+
+                            {/* Tombol 'X' Merah di Sudut Kanan Atas thumbnail (Persis Foto Utama) */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveSlotPhoto(index);
+                              }}
+                              className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer z-20 shadow-md"
+                              title={`Hapus foto ${slotInfo.label}`}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Drag Indicator Badge on Top Left */}
+                            <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-black/80 backdrop-blur-xs text-[9px] font-mono text-neutral-300 flex items-center gap-1 pointer-events-none">
+                              <Move className="w-2.5 h-2.5 text-[#D4AF37]" />
+                              <span>#{slotInfo.id}</span>
+                            </div>
+
+                            {/* Bottom Controls Bar (Panah Geser & Ganti Foto) */}
+                            <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-1.5 flex items-center justify-between gap-1 z-10">
+                              <button
+                                type="button"
+                                disabled={index === 0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSwapSlots(index, index - 1);
+                                }}
+                                className="p-1 bg-white/10 hover:bg-[#D4AF37] hover:text-black text-white rounded transition-colors disabled:opacity-20 disabled:hover:bg-white/10 disabled:hover:text-white cursor-pointer"
+                                title="Geser ke kiri (tukar posisi)"
+                              >
+                                <ChevronLeft className="w-3 h-3" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  singleSlotInputRefs.current[index]?.click();
+                                }}
+                                className="px-1.5 py-0.5 bg-white/10 hover:bg-[#D4AF37] hover:text-black text-neutral-200 text-[9px] font-mono rounded transition-colors cursor-pointer flex items-center gap-1"
+                                title="Ganti foto slot ini"
+                              >
+                                <Upload className="w-2.5 h-2.5" />
+                                <span>Ganti</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={index === GALLERY_SLOTS.length - 1}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSwapSlots(index, index + 1);
+                                }}
+                                className="p-1 bg-white/10 hover:bg-[#D4AF37] hover:text-black text-white rounded transition-colors disabled:opacity-20 disabled:hover:bg-white/10 disabled:hover:text-white cursor-pointer"
+                                title="Geser ke kanan (tukar posisi)"
+                              >
+                                <ChevronRight className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Empty Slot Upload Card */
+                          <div
+                            onClick={() => singleSlotInputRefs.current[index]?.click()}
+                            className="w-full h-full flex flex-col items-center justify-center p-2 text-center cursor-pointer hover:bg-white/5 transition-colors group"
+                            title={`Klik untuk unggah foto ${slotInfo.label}`}
+                          >
+                            <Camera className="w-5 h-5 mb-1 text-neutral-600 group-hover:text-[#D4AF37] transition-colors" />
+                            <span className="text-[10px] font-mono text-neutral-400 group-hover:text-white transition-colors">
+                              + Unggah Foto
+                            </span>
+                            <span className="text-[8px] font-mono text-neutral-500 mt-0.5">
+                              {slotInfo.label}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-3 bg-black/20 border border-white/5 text-center text-neutral-500 text-xs">
-                  Belum ada foto galeri tambahan. Klik tombol "+ Tambah Galeri" untuk mengunggah multi-foto.
-                </div>
-              )}
+                  );
+                })}
+              </div>
             </div>
           </div>
 
