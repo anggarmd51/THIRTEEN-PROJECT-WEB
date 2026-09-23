@@ -43,7 +43,7 @@ export default function AdminPortfolioModal({
           {editingPortfolioId ? "Edit Portofolio" : "Tambah Portofolio Baru"}
         </h3>
         <p className="text-xs text-neutral-400 font-light mb-6">
-          Tambahkan dokumentasi hasil pengerjaan detailing, biled, atau cuci mobil ke Supabase.
+          Tambahkan dokumentasi hasil pengerjaan detailing, biled, atau cuci mobil ke database.
         </p>
 
         <form onSubmit={onSubmit} className="space-y-4 text-xs">
@@ -159,7 +159,7 @@ export default function AdminPortfolioModal({
             <input
               type="url"
               required
-              placeholder="https://images.unsplash.com/... atau URL Supabase Storage"
+              placeholder="https://images.unsplash.com/... atau URL Cloud Storage"
               value={formData.image_url}
               onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
               className="w-full bg-[#1B1D22] border border-white/10 px-3 py-2 text-white focus:border-[#D4AF37] focus:outline-none"
@@ -204,7 +204,7 @@ export default function AdminPortfolioModal({
               disabled={submitting}
               className="px-6 py-2 bg-[#D4AF37] hover:bg-[#E5C05B] text-black font-semibold uppercase tracking-wider text-xs cursor-pointer disabled:opacity-50"
             >
-              {submitting ? "Menyimpan ke Supabase..." : editingPortfolioId ? "SIMPAN PERUBAHAN" : "TAMBAH PORTOFOLIO"}
+              {submitting ? "Menyimpan ke Database..." : editingPortfolioId ? "SIMPAN PERUBAHAN" : "TAMBAH PORTOFOLIO"}
             </button>
           </div>
         </form>

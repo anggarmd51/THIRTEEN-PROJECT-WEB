@@ -15,7 +15,7 @@ export default function AdminCarTable({ cars, onEdit, onDelete }: AdminCarTableP
             Daftar Stok Unit Mobil
           </h3>
           <p className="text-xs text-neutral-400 font-light mt-0.5">
-            Unit aktif yang tersimpan di Supabase dan tampil pada halaman katalog.
+            Unit aktif yang tersimpan akan tampil pada halaman katalog.
           </p>
         </div>
         <span className="text-xs font-mono text-[#D4AF37]">
@@ -28,7 +28,7 @@ export default function AdminCarTable({ cars, onEdit, onDelete }: AdminCarTableP
           <Car className="w-10 h-10 text-neutral-600 mx-auto" />
           <h4 className="text-sm font-light text-white">Database Mobil Masih Kosong</h4>
           <p className="text-xs text-neutral-400 max-w-sm mx-auto">
-            Belum ada unit mobil tersimpan di tabel &quot;cars&quot; Supabase. Klik tombol &quot;+ TAMBAH UNIT MOBIL&quot; di atas untuk memasukkan stok mobil pertama Anda.
+            Belum ada unit mobil tersimpan di database. Klik tombol &quot;+ TAMBAH UNIT MOBIL&quot; di atas untuk memasukkan stok mobil pertama Anda.
           </p>
         </div>
       ) : (

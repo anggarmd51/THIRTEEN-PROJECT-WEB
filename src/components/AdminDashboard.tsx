@@ -11,7 +11,6 @@ import {
   ArrowLeft,
   X,
   Database,
-  Download,
   Loader2,
 } from "lucide-react";
 import { isSupabaseConfigured } from "../lib/supabase";
@@ -25,8 +24,6 @@ import {
   updatePortfolioInSupabase,
   deletePortfolioFromSupabase,
 } from "../lib/supabaseDb";
-import { CARS_DATA } from "../data/carsData";
-import { PORTFOLIO_ITEMS } from "../data/portfolioData";
 import { uploadCarImage, uploadMultipleCarImages, uploadPortfolioImage } from "../lib/storage";
 import { CarFormData, PortfolioFormData, GalleryPhotoItem, CarUnit, PortfolioItem } from "../types";
 import Logo from "./Logo";
@@ -106,7 +103,6 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
   // Feedback notifications & status
   const [alert, setAlert] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
 
   // Auto clear alert after 5 seconds
   useEffect(() => {
@@ -116,14 +112,14 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
     }
   }, [alert]);
 
-  // Fetch cars strictly from Supabase
+  // Fetch cars from database
   const loadCars = useCallback(async () => {
     setLoadingCars(true);
     const { data, error } = await fetchCarsFromSupabase();
     if (error) {
       setAlert({
         type: "error",
-        text: `Gagal memuat mobil dari Supabase: ${error.message}. Pastikan tabel "cars" telah dibuat via Supabase SQL Editor.`,
+        text: `Gagal memuat data mobil dari database: ${error.message}`,
       });
       setCars([]);
     } else {
@@ -132,14 +128,14 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
     setLoadingCars(false);
   }, []);
 
-  // Fetch portfolios strictly from Supabase
+  // Fetch portfolios from database
   const loadPortfolios = useCallback(async () => {
     setLoadingPortfolios(true);
     const { data, error } = await fetchPortfoliosFromSupabase();
     if (error) {
       setAlert({
         type: "error",
-        text: `Gagal memuat portofolio dari Supabase: ${error.message}. Pastikan tabel "portfolio" telah dibuat via Supabase SQL Editor.`,
+        text: `Gagal memuat portofolio dari database: ${error.message}`,
       });
       setPortfolios([]);
     } else {
@@ -172,7 +168,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
 
       setAlert({
         type: "success",
-        text: "Foto utama berhasil diunggah ke Supabase Storage!",
+        text: "Foto utama berhasil diunggah!",
       });
     } catch (err: any) {
       setAlert({
@@ -237,7 +233,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
       }));
       setAlert({
         type: "success",
-        text: "Foto portofolio berhasil diunggah ke Supabase Storage!",
+        text: "Foto portofolio berhasil diunggah!",
       });
     } catch (err: any) {
       setAlert({
@@ -296,12 +292,12 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
         if (error) {
           setAlert({
             type: "error",
-            text: `Gagal memperbarui unit di Supabase: ${error.message}`,
+            text: `Gagal memperbarui unit di database: ${error.message}`,
           });
         } else {
           setAlert({
             type: "success",
-            text: `Unit mobil "${carFormData.name}" berhasil diperbarui di Supabase!`,
+            text: `Unit mobil "${carFormData.name}" berhasil diperbarui!`,
           });
           setCarModalOpen(false);
           setEditingCarId(null);
@@ -312,12 +308,12 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
         if (error) {
           setAlert({
             type: "error",
-            text: `Gagal menambahkan unit ke Supabase: ${error.message}`,
+            text: `Gagal menambahkan unit ke database: ${error.message}`,
           });
         } else {
           setAlert({
             type: "success",
-            text: `Unit mobil baru "${carFormData.name}" berhasil disimpan ke Supabase!`,
+            text: `Unit mobil baru "${carFormData.name}" berhasil disimpan!`,
           });
           setCarModalOpen(false);
           setEditingCarId(null);
@@ -331,9 +327,9 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
     }
   };
 
-  // Delete Car from Supabase
+  // Delete Car
   const handleDeleteCar = async (id: string, name: string) => {
-    if (!window.confirm(`Yakin ingin menghapus unit "${name}" dari Supabase secara permanen?`)) {
+    if (!window.confirm(`Yakin ingin menghapus unit "${name}" secara permanen?`)) {
       return;
     }
 
@@ -348,7 +344,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
       } else {
         setAlert({
           type: "success",
-          text: `Unit "${name}" berhasil dihapus dari database Supabase.`,
+          text: `Unit "${name}" berhasil dihapus dari database.`,
         });
         await loadCars();
       }
@@ -427,12 +423,12 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
         if (error) {
           setAlert({
             type: "error",
-            text: `Gagal memperbarui portofolio di Supabase: ${error.message}`,
+            text: `Gagal memperbarui portofolio di database: ${error.message}`,
           });
         } else {
           setAlert({
             type: "success",
-            text: `Portofolio "${portfolioFormData.title}" berhasil diperbarui di Supabase!`,
+            text: `Portofolio "${portfolioFormData.title}" berhasil diperbarui!`,
           });
           setPortfolioModalOpen(false);
           setEditingPortfolioId(null);
@@ -443,12 +439,12 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
         if (error) {
           setAlert({
             type: "error",
-            text: `Gagal menambahkan portofolio ke Supabase: ${error.message}`,
+            text: `Gagal menambahkan portofolio ke database: ${error.message}`,
           });
         } else {
           setAlert({
             type: "success",
-            text: `Portofolio "${portfolioFormData.title}" berhasil disimpan ke Supabase!`,
+            text: `Portofolio "${portfolioFormData.title}" berhasil disimpan!`,
           });
           setPortfolioModalOpen(false);
           setEditingPortfolioId(null);
@@ -462,7 +458,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
     }
   };
 
-  // Delete Portfolio from Supabase
+  // Delete Portfolio
   const handleDeletePortfolio = async (id: string, title: string) => {
     if (!window.confirm(`Yakin ingin menghapus portofolio "${title}" secara permanen?`)) {
       return;
@@ -479,7 +475,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
       } else {
         setAlert({
           type: "success",
-          text: `Portofolio "${title}" berhasil dihapus dari Supabase.`,
+          text: `Portofolio "${title}" berhasil dihapus dari database.`,
         });
         await loadPortfolios();
       }
@@ -526,71 +522,6 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
     setPortfolioModalOpen(true);
   };
 
-  // Migration / Seed Data Helper: Seeds initial data into Supabase if desired
-  const handleSeedInitialData = async () => {
-    if (!window.confirm("Migrasi data awal dari katalog ke Supabase sekarang?")) return;
-
-    setIsSeeding(true);
-    setAlert(null);
-    try {
-      let insertedCars = 0;
-      let insertedPortfolios = 0;
-
-      // Seed cars if currently empty
-      for (const car of CARS_DATA) {
-        const formData: CarFormData = {
-          name: car.name,
-          model: car.model,
-          brand: car.brand,
-          year: car.year,
-          price: car.price,
-          mileage: car.mileage,
-          transmission: car.transmission,
-          fuel_type: car.fuelType,
-          color: car.color,
-          engine: car.engine,
-          tax_status: car.taxStatus,
-          plate: car.plate,
-          location: car.location,
-          badge: car.badge,
-          description: car.description,
-          main_image: car.mainImage,
-          highlights: car.highlights,
-          gallery: car.gallery,
-        };
-        const res = await insertCarToSupabase(formData);
-        if (!res.error) insertedCars++;
-      }
-
-      // Seed portfolios if currently empty
-      for (const p of PORTFOLIO_ITEMS) {
-        const pData: PortfolioFormData = {
-          title: p.title,
-          category: p.category,
-          badge: p.badge,
-          subtitle: p.subtitle,
-          image_url: p.imageUrl,
-          description: p.description,
-          car_model: p.carModel,
-          treatment_list: p.treatmentList,
-        };
-        const res = await insertPortfolioToSupabase(pData);
-        if (!res.error) insertedPortfolios++;
-      }
-
-      setAlert({
-        type: "success",
-        text: `Migrasi selesai! Berhasil menyimpan ${insertedCars} unit mobil dan ${insertedPortfolios} portofolio ke Supabase.`,
-      });
-      await loadCars();
-      await loadPortfolios();
-    } catch (err: any) {
-      setAlert({ type: "error", text: `Gagal migrasi: ${err.message}` });
-    } finally {
-      setIsSeeding(false);
-    }
-  };
-
   const configured = isSupabaseConfigured();
 
   return (
@@ -610,7 +541,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
           </a>
           <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-mono uppercase tracking-wider bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30">
             <Database className="w-3 h-3" />
-            <span>SUPABASE CONNECTED</span>
+            <span>DATABASE CONNECTED</span>
           </span>
         </div>
 
@@ -646,7 +577,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
             <div className="flex items-center gap-2">
               <Database className="w-4 h-4 text-amber-400 shrink-0" />
               <span>
-                <strong>Catatan Supabase:</strong> Pastikan Anda telah mengatur variable <code>VITE_SUPABASE_URL</code> dan <code>VITE_SUPABASE_ANON_KEY</code> pada file <code>.env</code> Anda, serta menjalankan skrip SQL dari <code>supabase/schema.sql</code>.
+                <strong>Catatan Konfigurasi:</strong> Pastikan Anda telah mengatur variabel koneksi database pada file <code>.env</code> Anda.
               </span>
             </div>
           </div>
@@ -680,27 +611,14 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#22242B]">
           <div>
             <h1 className="text-xl sm:text-2xl font-light tracking-tight text-white">
-              Pusat Manajemen Database Supabase
+              DASHBOARD ADMIN
             </h1>
             <p className="text-xs text-neutral-400 font-light mt-0.5">
-              Kelola katalog mobil bekas (tabel <code>cars</code>) dan portofolio (tabel <code>portfolio</code>) dengan operasi CRUD real-time.
+              KELOLA KATALOG MOBIL &amp; PORTOFOLIO
             </p>
           </div>
 
           <div className="flex items-center flex-wrap gap-2.5">
-            {/* Quick Seed Button if table is empty */}
-            {(cars.length === 0 || portfolios.length === 0) && (
-              <button
-                onClick={handleSeedInitialData}
-                disabled={isSeeding}
-                className="inline-flex items-center gap-1.5 px-3 py-2 border border-[#D4AF37]/50 hover:border-[#D4AF37] bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50"
-                title="Migrasi data awal ke Supabase"
-              >
-                {isSeeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                <span>{isSeeding ? "Memigrasikan..." : "Migrasi Data Awal ke DB"}</span>
-              </button>
-            )}
-
             {activeTab === "cars" ? (
               <button
                 onClick={openAddCar}
@@ -724,7 +642,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
                 loadCars();
                 loadPortfolios();
               }}
-              title="Refresh Data dari Supabase"
+              title="Muat Ulang Data"
               className="p-2 border border-white/10 hover:border-white/20 text-neutral-400 hover:text-white transition-colors cursor-pointer"
             >
               <RefreshCw className={`w-4 h-4 ${loadingCars || loadingPortfolios ? "animate-spin" : ""}`} />
@@ -764,7 +682,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
             {loadingCars && cars.length === 0 ? (
               <div className="p-12 text-center text-neutral-400 text-xs">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[#D4AF37]" />
-                <span>Memuat data mobil dari Supabase...</span>
+                <span>Memuat data mobil...</span>
               </div>
             ) : (
               <AdminCarTable cars={cars} onEdit={openEditCar} onDelete={handleDeleteCar} />
@@ -778,7 +696,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
             {loadingPortfolios && portfolios.length === 0 ? (
               <div className="p-12 text-center text-neutral-400 text-xs">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[#D4AF37]" />
-                <span>Memuat portofolio dari Supabase...</span>
+                <span>Memuat data portofolio...</span>
               </div>
             ) : (
               <AdminPortfolioGrid

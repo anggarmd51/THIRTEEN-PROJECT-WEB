@@ -19,7 +19,7 @@ export default function AdminPortfolioGrid({
             Galeri Hasil Pengerjaan (Portofolio)
           </h3>
           <p className="text-xs text-neutral-400 font-light mt-0.5">
-            Portofolio aktif yang tersimpan di Supabase dan ditampilkan pada carousel slider beranda.
+            Portofolio aktif yang tersimpan akan ditampilkan pada carousel slider beranda.
           </p>
         </div>
         <span className="text-xs font-mono text-[#D4AF37]">
@@ -32,7 +32,7 @@ export default function AdminPortfolioGrid({
           <Layers className="w-10 h-10 text-neutral-600 mx-auto" />
           <h4 className="text-sm font-light text-white">Database Portofolio Masih Kosong</h4>
           <p className="text-xs text-neutral-400 max-w-sm mx-auto">
-            Belum ada dokumentasi pengerjaan di tabel &quot;portfolio&quot; Supabase. Klik tombol &quot;+ TAMBAH PORTOFOLIO&quot; untuk menambahkan hasil pengerjaan baru.
+            Belum ada dokumentasi pengerjaan di database. Klik tombol &quot;+ TAMBAH PORTOFOLIO&quot; untuk menambahkan hasil pengerjaan baru.
           </p>
         </div>
       ) : (

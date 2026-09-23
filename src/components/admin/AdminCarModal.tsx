@@ -292,14 +292,14 @@ export default function AdminCarModal({
             </div>
           </div>
 
-          {/* SECTION C: FILE UPLOAD FOTO KE SUPABASE STORAGE */}
+          {/* SECTION C: FILE UPLOAD FOTO KE STORAGE */}
           <div className="p-4 bg-[#18191E] border border-white/5 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-mono font-semibold tracking-wider text-[#D4AF37] uppercase block">
-                3. FOTO KENDARAAN (SUPABASE STORAGE UPLOAD)
+                3. FOTO KENDARAAN (CLOUD STORAGE UPLOAD)
               </span>
               <span className="text-[10px] font-mono text-neutral-400">
-                Bucket: <strong className="text-white">car-photos</strong>
+                Penyimpanan: <strong className="text-white">car-photos</strong>
               </span>
             </div>
 
@@ -347,10 +347,10 @@ export default function AdminCarModal({
                     className="inline-flex items-center gap-2 px-4 py-2 border border-[#D4AF37] bg-[#D4AF37]/10 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-black font-semibold uppercase tracking-wider text-xs transition-colors cursor-pointer disabled:opacity-50"
                   >
                     <Upload className="w-4 h-4" />
-                    <span>{isUploadingMain ? "Mengunggah ke Supabase..." : "Unggah File Foto Utama"}</span>
+                    <span>{isUploadingMain ? "Mengunggah foto..." : "Unggah File Foto Utama"}</span>
                   </button>
                   <p className="text-[11px] text-neutral-400 font-light">
-                    Mendukung format PNG, JPG, JPEG, atau WebP. Gambar otomatis disimpan ke storage Supabase dan menghasilkan tautan publik.
+                    Mendukung format PNG, JPG, JPEG, atau WebP. Gambar otomatis disimpan ke storage dan menghasilkan tautan publik.
                   </p>
                 </div>
               </div>
@@ -505,7 +505,7 @@ export default function AdminCarModal({
               className="px-7 py-2.5 bg-[#D4AF37] hover:bg-[#E5C05B] text-black font-semibold uppercase tracking-wider text-xs cursor-pointer disabled:opacity-50 shadow-lg"
             >
               {submitting
-                ? "Menyimpan ke Supabase..."
+                ? "Menyimpan ke Database..."
                 : editingCarId
                 ? "SIMPAN PERUBAHAN UNIT"
                 : "TAMBAH UNIT KE KATALOG"}
