@@ -14,15 +14,18 @@ export interface CarSpecItem {
  */
 export interface SupabaseCarRow {
   id: string;
-  name: string;
-  brand: string;
-  model: string;
+  name?: string;
+  title?: string;
+  brand?: string;
+  model?: string;
+  category?: string;
   year: number;
   price: number;
   badge?: string;
   transmission: string;
-  mileage: number;
+  mileage: number | string;
   engine?: string;
+  fuel?: string;
   fuel_type?: string;
   fuelType?: string;
   color?: string;
@@ -30,8 +33,10 @@ export interface SupabaseCarRow {
   taxStatus?: string;
   plate?: string;
   location?: string;
-  main_image: string;
+  main_image?: string;
   mainImage?: string;
+  image_url?: string;
+  imageUrl?: string;
   description?: string;
   highlights?: string[] | string;
   gallery?: GalleryPhotoItem[] | string;

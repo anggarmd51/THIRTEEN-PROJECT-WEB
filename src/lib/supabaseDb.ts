@@ -12,7 +12,60 @@ import {
 /**
  * Normalizes Supabase car row into typed CarUnit for frontend presentation
  */
+export function buildCarPayload(formData: CarFormData): Record<string, any> {
+  const currentGallery: GalleryPhotoItem[] =
+    Array.isArray(formData.gallery) && formData.gallery.length > 0
+      ? formData.gallery
+      : [{ title: formData.name || "Foto Utama", url: formData.main_image, tag: "Depan" }];
+
+  const currentHighlights: string[] =
+    Array.isArray(formData.highlights)
+      ? formData.highlights.filter(Boolean)
+      : [];
+
+  const metadata = {
+    name: formData.name,
+    brand: formData.brand || "Umum",
+    model: formData.model || formData.name,
+    badge: formData.badge || "AVAILABLE",
+    engine: formData.engine || "",
+    plate: formData.plate || "",
+    highlights: currentHighlights,
+    gallery: currentGallery,
+  };
+
+  const rawDesc = (formData.description || "").replace(/<!--JSON_METADATA:[\s\S]*?-->/g, "").trim();
+  const descWithMeta = `${rawDesc}\n\n<!--JSON_METADATA:${JSON.stringify(metadata)}-->`;
+
+  return {
+    title: String(formData.name || formData.model || "Unit Mobil").trim(),
+    category: String(formData.badge || formData.model || "AVAILABLE").trim(),
+    price: Number(formData.price) || 0,
+    year: Number(formData.year) || new Date().getFullYear(),
+    transmission: String(formData.transmission || "Automatic (CVT)").trim(),
+    mileage: String(formData.mileage ?? 0),
+    fuel: String(formData.fuel_type || "Bensin").trim(),
+    color: String(formData.color || "Hitam Metalik").trim(),
+    tax_status: String(formData.tax_status || "Pajak Hidup").trim(),
+    location: String(formData.location || "Langkat / Medan").trim(),
+    description: descWithMeta,
+    image_url: String(formData.main_image || "").trim(),
+  };
+}
+
 export function mapRowToCarUnit(row: Partial<SupabaseCarRow>): CarUnit {
+  let rawDesc = row.description || "";
+  let meta: Record<string, any> = {};
+  const metaMatch = rawDesc.match(/<!--JSON_METADATA:([\s\S]*?)-->/);
+  if (metaMatch) {
+    try {
+      meta = JSON.parse(metaMatch[1]);
+      rawDesc = rawDesc.replace(/<!--JSON_METADATA:[\s\S]*?-->/g, "").trim();
+    } catch {
+      // ignore parse failure
+    }
+  }
+
   const priceVal = Number(row.price) || 0;
   const mileageVal = Number(row.mileage) || 0;
 
@@ -25,15 +78,27 @@ export function mapRowToCarUnit(row: Partial<SupabaseCarRow>): CarUnit {
     } catch {
       galleryArr = [];
     }
+  } else if (Array.isArray(meta.gallery)) {
+    galleryArr = meta.gallery;
   }
 
   const mainImg =
     row.main_image ||
     row.mainImage ||
+    row.image_url ||
+    row.imageUrl ||
+    meta.main_image ||
     "https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?q=80&w=1400&auto=format&fit=crop";
 
+  const carName = row.name || row.title || meta.name || "Unit Mobil";
+  const carBrand = row.brand || meta.brand || "Umum";
+  const carModel = row.model || meta.model || row.title || row.name || "Sedan / SUV";
+  const carBadge = row.badge || meta.badge || row.category || "AVAILABLE";
+  const carEngine = row.engine || meta.engine || "Standar Mesin";
+  const carPlate = row.plate || meta.plate || "BK (Sumatera Utara)";
+
   if (galleryArr.length === 0) {
-    galleryArr = [{ title: row.name || "Tampak Depan", url: mainImg, tag: "Utama" }];
+    galleryArr = [{ title: carName, url: mainImg, tag: "Utama" }];
   }
 
   let highlightsArr: string[] = [];
@@ -45,16 +110,18 @@ export function mapRowToCarUnit(row: Partial<SupabaseCarRow>): CarUnit {
     } catch {
       highlightsArr = row.highlights.split("\n").filter(Boolean);
     }
+  } else if (Array.isArray(meta.highlights)) {
+    highlightsArr = meta.highlights;
   }
 
-  const fuel = row.fuel_type || row.fuelType || "Bensin";
+  const fuel = row.fuel || row.fuel_type || row.fuelType || meta.fuel_type || "Bensin";
   const tax = row.tax_status || row.taxStatus || "Pajak Hidup Panjang";
 
   return {
     id: String(row.id || `car-${Date.now()}`),
-    name: row.name || "Unit Mobil",
-    brand: row.brand || "Umum",
-    model: row.model || row.name || "Sedan / SUV",
+    name: carName,
+    brand: carBrand,
+    model: carModel,
     year: Number(row.year) || new Date().getFullYear(),
     price: priceVal,
     formattedPrice: new Intl.NumberFormat("id-ID", {
@@ -62,20 +129,20 @@ export function mapRowToCarUnit(row: Partial<SupabaseCarRow>): CarUnit {
       currency: "IDR",
       maximumFractionDigits: 0,
     }).format(priceVal),
-    badge: row.badge || "AVAILABLE",
+    badge: carBadge,
     transmission: row.transmission || "Automatic",
     mileage: mileageVal,
     formattedMileage: `${new Intl.NumberFormat("id-ID").format(mileageVal)} KM`,
-    engine: row.engine || "Standar Mesin",
+    engine: carEngine,
     fuelType: fuel,
     color: row.color || "Hitam / Silver",
     taxStatus: tax,
-    plate: row.plate || "BK (Sumatera Utara)",
+    plate: carPlate,
     location: row.location || "Langkat / Medan",
     mainImage: mainImg,
     gallery: galleryArr,
     description:
-      row.description ||
+      rawDesc ||
       "Unit pilihan dengan inspeksi komprehensif, siap pakai tanpa kendala.",
     highlights:
       highlightsArr.length > 0
@@ -90,7 +157,7 @@ export function mapRowToCarUnit(row: Partial<SupabaseCarRow>): CarUnit {
       { label: "Jarak Tempuh", value: `${new Intl.NumberFormat("id-ID").format(mileageVal)} KM` },
       { label: "Transmisi", value: row.transmission || "Automatic" },
       { label: "Bahan Bakar", value: fuel },
-      { label: "Kapasitas Mesin", value: row.engine || "Standar Mesin" },
+      { label: "Kapasitas Mesin", value: carEngine },
       { label: "Warna Eksterior", value: row.color || "Standar" },
     ],
   };
@@ -158,31 +225,7 @@ export async function fetchCarsFromSupabase(): Promise<{ data: CarUnit[]; error:
 }
 
 export async function insertCarToSupabase(formData: CarFormData): Promise<{ data: any; error: Error | null }> {
-  const currentGallery =
-    formData.gallery.length > 0
-      ? formData.gallery
-      : [{ title: formData.name, url: formData.main_image, tag: "Depan" }];
-
-  const payload = {
-    name: formData.name,
-    model: formData.model || formData.name,
-    brand: formData.brand || "Umum",
-    year: Number(formData.year),
-    price: Number(formData.price),
-    mileage: Number(formData.mileage),
-    transmission: formData.transmission,
-    fuel_type: formData.fuel_type,
-    color: formData.color,
-    engine: formData.engine,
-    tax_status: formData.tax_status,
-    plate: formData.plate,
-    location: formData.location,
-    badge: formData.badge,
-    description: formData.description,
-    main_image: formData.main_image,
-    highlights: formData.highlights,
-    gallery: currentGallery,
-  };
+  const payload = buildCarPayload(formData);
 
   try {
     const { data, error } = await supabase.from("cars").insert([payload]).select().single();
@@ -199,32 +242,7 @@ export async function updateCarInSupabase(
   id: string,
   formData: CarFormData
 ): Promise<{ data: any; error: Error | null }> {
-  const currentGallery =
-    formData.gallery.length > 0
-      ? formData.gallery
-      : [{ title: formData.name, url: formData.main_image, tag: "Depan" }];
-
-  const payload = {
-    name: formData.name,
-    model: formData.model || formData.name,
-    brand: formData.brand || "Umum",
-    year: Number(formData.year),
-    price: Number(formData.price),
-    mileage: Number(formData.mileage),
-    transmission: formData.transmission,
-    fuel_type: formData.fuel_type,
-    color: formData.color,
-    engine: formData.engine,
-    tax_status: formData.tax_status,
-    plate: formData.plate,
-    location: formData.location,
-    badge: formData.badge,
-    description: formData.description,
-    main_image: formData.main_image,
-    highlights: formData.highlights,
-    gallery: currentGallery,
-    updated_at: new Date().toISOString(),
-  };
+  const payload = buildCarPayload(formData);
 
   try {
     const { data, error } = await supabase.from("cars").update(payload).eq("id", id).select().single();

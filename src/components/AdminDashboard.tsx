@@ -846,6 +846,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
         hasDraft={hasCarDraft}
         onClose={handleCloseCarModal}
         onSubmit={handleSaveCar}
+        onSuccess={loadCars}
         onMainImageUpload={handleMainImageUpload}
         onGalleryUpload={handleGalleryUpload}
         onRemoveGalleryPhoto={handleRemoveGalleryPhoto}

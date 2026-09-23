@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { X, Upload, Camera, PlusCircle, Trash, Check, AlertCircle, Sparkles } from "lucide-react";
-import { CarFormData } from "../../types";
+import { CarFormData, GalleryPhotoItem } from "../../types";
+import { insertCarToSupabase, updateCarInSupabase } from "../../lib/supabaseDb";
 
 interface AdminCarModalProps {
   isOpen: boolean;
@@ -11,16 +12,46 @@ interface AdminCarModalProps {
   setNewHighlightInput: (val: string) => void;
   isUploadingMain: boolean;
   isUploadingGallery: boolean;
-  submitting: boolean;
+  submitting?: boolean;
   hasDraft?: boolean;
   onClose: () => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit?: (e: React.FormEvent) => void;
+  onSuccess?: () => void;
   onMainImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onGalleryUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemoveGalleryPhoto: (index: number) => void;
   onAddHighlight: () => void;
   onRemoveHighlight: (index: number) => void;
 }
+
+const CAR_DRAFT_KEY = "admin_car_form_draft_v1";
+
+const DEFAULT_RESET_DATA: CarFormData = {
+  name: "",
+  model: "",
+  brand: "",
+  year: new Date().getFullYear(),
+  price: 350000000,
+  mileage: 20000,
+  transmission: "Automatic (CVT)",
+  fuel_type: "Bensin",
+  color: "Hitam Metalik",
+  engine: "1.5L Turbo",
+  tax_status: "Pajak Hidup",
+  plate: "BK (Sumatera Utara)",
+  location: "Langkat / Medan",
+  badge: "AVAILABLE",
+  description:
+    "Unit terawat istimewa dengan service record resmi, telah lolos inspeksi 150+ titik dan siap pakai.",
+  main_image:
+    "https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?q=80&w=1400&auto=format&fit=crop",
+  highlights: [
+    "Lolos Inspeksi 150+ Titik Ketat",
+    "Odometer Asli (Garansi Bukan Putaran)",
+    "Bukan Bekas Tabrakan & Bebas Banjir 100%",
+  ],
+  gallery: [],
+};
 
 export default function AdminCarModal({
   isOpen,
@@ -31,10 +62,11 @@ export default function AdminCarModal({
   setNewHighlightInput,
   isUploadingMain,
   isUploadingGallery,
-  submitting,
+  submitting: externalSubmitting = false,
   hasDraft = false,
   onClose,
-  onSubmit,
+  onSubmit: externalOnSubmit,
+  onSuccess,
   onMainImageUpload,
   onGalleryUpload,
   onRemoveGalleryPhoto,
@@ -44,73 +76,80 @@ export default function AdminCarModal({
   const mainImageInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [internalLoading, setInternalLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const isSaving = internalLoading || externalSubmitting;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
 
-    // Client-side validations with clear feedback
-    if (!carFormData.name.trim()) {
-      setValidationError("Nama Unit / Judul kendaraan wajib diisi.");
-      return;
-    }
-    if (!carFormData.model.trim()) {
-      setValidationError("Sub-judul / Tipe Detail kendaraan wajib diisi.");
-      return;
-    }
-    if (!carFormData.brand.trim()) {
-      setValidationError("Merek / Brand kendaraan wajib diisi.");
-      return;
-    }
-    if (!carFormData.year || carFormData.year < 1990 || carFormData.year > 2035) {
-      setValidationError("Tahun pembuatan harus berada di antara 1990 dan 2035.");
-      return;
-    }
-    if (!carFormData.price || carFormData.price <= 0) {
-      setValidationError("Harga Jual kendaraan wajib diisi dengan angka positif.");
-      return;
-    }
-    if (carFormData.mileage === undefined || carFormData.mileage === null || carFormData.mileage < 0) {
-      setValidationError("Kilometer / Odometer harus diisi dengan angka minimal 0.");
-      return;
-    }
-    if (!carFormData.fuel_type.trim()) {
-      setValidationError("Bahan Bakar kendaraan wajib diisi.");
-      return;
-    }
-    if (!carFormData.color.trim()) {
-      setValidationError("Warna Eksterior kendaraan wajib diisi.");
-      return;
-    }
-    if (!carFormData.engine.trim()) {
-      setValidationError("Kapasitas Mesin kendaraan wajib diisi.");
-      return;
-    }
-    if (!carFormData.badge.trim()) {
-      setValidationError("Badge / Tag kendaraan wajib diisi.");
-      return;
-    }
-    if (!carFormData.tax_status.trim()) {
-      setValidationError("Status Pajak kendaraan wajib diisi.");
-      return;
-    }
-    if (!carFormData.location.trim()) {
-      setValidationError("Lokasi Unit kendaraan wajib diisi.");
-      return;
-    }
-    if (!carFormData.description.trim()) {
-      setValidationError("Deskripsi Lengkap Kondisi Mobil wajib diisi.");
-      return;
-    }
-    if (!carFormData.main_image || !carFormData.main_image.trim()) {
-      setValidationError("Silakan unggah atau sediakan minimal 1 Foto Utama kendaraan terlebih dahulu.");
+    // 1. Validasi Input di Sisi Klien
+    if (!carFormData.name || !carFormData.name.trim()) {
+      const msg = "Nama Unit / Judul kendaraan wajib diisi.";
+      setValidationError(msg);
+      alert("Peringatan: " + msg);
       return;
     }
 
-    // Call external submit handler
-    onSubmit(e);
+    if (!carFormData.main_image || !carFormData.main_image.trim()) {
+      const msg = "Silakan unggah atau isi minimal 1 Foto Utama kendaraan terlebih dahulu.";
+      setValidationError(msg);
+      alert("Peringatan: " + msg);
+      return;
+    }
+
+    setInternalLoading(true);
+
+    try {
+      if (editingCarId) {
+        // Mode EDIT: Update ke Supabase
+        const { error: updateError } = await updateCarInSupabase(editingCarId, carFormData);
+        if (updateError) {
+          throw updateError;
+        }
+
+        alert("Unit berhasil diperbarui!");
+      } else {
+        // Mode TAMBAH: Insert baru ke Supabase
+        const { error: insertError } = await insertCarToSupabase(carFormData);
+        if (insertError) {
+          throw insertError;
+        }
+
+        // Hapus draft di localStorage
+        try {
+          localStorage.removeItem(CAR_DRAFT_KEY);
+        } catch (e) {
+          console.warn("[AdminCarModal] Gagal menghapus draft localStorage:", e);
+        }
+
+        // Reset form data ke default
+        setCarFormData(DEFAULT_RESET_DATA);
+
+        // Notifikasi popup alert sesuai permintaan user
+        alert("Unit berhasil ditambahkan!");
+      }
+
+      // Panggil callback untuk refresh data katalog
+      if (onSuccess) {
+        await onSuccess();
+      } else if (externalOnSubmit) {
+        externalOnSubmit(e);
+      }
+
+      // Tutup modal secara otomatis
+      onClose();
+    } catch (err: any) {
+      console.error("[AdminCarModal] Gagal menyimpan ke Supabase:", err);
+      const errMsg = err?.message || JSON.stringify(err) || "Terjadi kesalahan tidak terduga";
+      setValidationError("Gagal menyimpan ke database: " + errMsg);
+      alert("Gagal menyimpan: " + errMsg);
+    } finally {
+      setInternalLoading(false);
+    }
   };
 
   return (
@@ -118,7 +157,8 @@ export default function AdminCarModal({
       <div className="bg-[#141519] border border-[#272A33] max-w-4xl w-full p-6 sm:p-8 my-8 shadow-2xl relative max-h-[92vh] overflow-y-auto">
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 text-neutral-400 hover:text-white p-1 cursor-pointer transition-colors"
+          disabled={isSaving}
+          className="absolute top-5 right-5 text-neutral-400 hover:text-white p-1 cursor-pointer transition-colors disabled:opacity-50"
           title="Tutup Modal"
         >
           <X className="w-5 h-5" />
@@ -146,7 +186,7 @@ export default function AdminCarModal({
         {validationError && (
           <div className="mb-6 p-3 bg-red-950/60 border border-red-500 text-red-200 text-xs flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-            <div className="flex-1 font-mono">{validationError}</div>
+            <div className="flex-1 font-mono break-all">{validationError}</div>
             <button
               type="button"
               onClick={() => setValidationError(null)}
@@ -157,7 +197,7 @@ export default function AdminCarModal({
           </div>
         )}
 
-        <form onSubmit={handleFormSubmit} className="space-y-6 text-xs">
+        <form onSubmit={handleSubmit} className="space-y-6 text-xs">
           {/* SECTION A: INFORMASI UTAMA & HARGA */}
           <div className="p-4 bg-[#18191E] border border-white/5 space-y-4">
             <span className="text-[11px] font-mono font-semibold tracking-wider text-[#D4AF37] uppercase block">
@@ -183,11 +223,10 @@ export default function AdminCarModal({
               </div>
               <div>
                 <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-1">
-                  Sub-judul / Tipe Detail *
+                  Sub-judul / Tipe Detail
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder="Contoh: Civic 1.5 VTEC Turbo Sedan"
                   value={carFormData.model}
                   onChange={(e) => {
@@ -202,11 +241,10 @@ export default function AdminCarModal({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-1">
-                  Merek / Brand *
+                  Merek / Brand
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder="Contoh: Honda / Toyota / BMW"
                   value={carFormData.brand}
                   onChange={(e) => {
@@ -337,11 +375,10 @@ export default function AdminCarModal({
 
               <div>
                 <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-1">
-                  Kapasitas Mesin *
+                  Kapasitas Mesin
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder="Contoh: 1.5L DOHC VTEC Turbocharged"
                   value={carFormData.engine}
                   onChange={(e) => {
@@ -471,7 +508,7 @@ export default function AdminCarModal({
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
                       type="button"
-                      disabled={isUploadingMain}
+                      disabled={isUploadingMain || isSaving}
                       onClick={() => mainImageInputRef.current?.click()}
                       className="inline-flex items-center gap-2 px-4 py-2 border border-[#D4AF37] bg-[#D4AF37]/10 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-black font-semibold uppercase tracking-wider text-xs transition-colors cursor-pointer disabled:opacity-50"
                     >
@@ -520,7 +557,7 @@ export default function AdminCarModal({
                 />
                 <button
                   type="button"
-                  disabled={isUploadingGallery}
+                  disabled={isUploadingGallery || isSaving}
                   onClick={() => galleryInputRef.current?.click()}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/20 hover:border-[#D4AF37] text-white hover:text-[#D4AF37] uppercase text-[11px] font-mono transition-colors cursor-pointer disabled:opacity-50"
                 >
@@ -569,11 +606,10 @@ export default function AdminCarModal({
 
             <div>
               <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-1">
-                Deskripsi Lengkap Kondisi Mobil *
+                Deskripsi Lengkap Kondisi Mobil
               </label>
               <textarea
                 rows={4}
-                required
                 value={carFormData.description}
                 onChange={(e) => {
                   setValidationError(null);
@@ -641,17 +677,18 @@ export default function AdminCarModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 border border-white/10 hover:bg-white/5 text-neutral-300 uppercase tracking-wider text-xs cursor-pointer"
+              disabled={isSaving}
+              className="px-5 py-2.5 border border-white/10 hover:bg-white/5 text-neutral-300 uppercase tracking-wider text-xs cursor-pointer disabled:opacity-50"
             >
               Batal
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={isSaving}
               className="px-7 py-2.5 bg-[#D4AF37] hover:bg-[#E5C05B] text-black font-semibold uppercase tracking-wider text-xs cursor-pointer disabled:opacity-50 shadow-lg"
             >
-              {submitting
-                ? "Menyimpan ke Database..."
+              {isSaving
+                ? "MENYIMPAN KE DATABASE..."
                 : editingCarId
                 ? "SIMPAN PERUBAHAN UNIT"
                 : "TAMBAH UNIT KE KATALOG"}
