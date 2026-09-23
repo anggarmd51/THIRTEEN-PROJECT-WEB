@@ -48,12 +48,12 @@ async function uploadToBucket(
       });
 
     if (error) {
-      console.warn(`Supabase Storage (${bucketName}) upload warning:`, error.message);
+      console.error(`[Storage Upload Error] Gagal upload ke bucket "${bucketName}":`, error);
       const base64Url = await fileToBase64(file);
       return {
         url: base64Url,
         path: fileName,
-        error: error.message,
+        error: `Supabase Storage (${bucketName}): ${error.message}`,
       };
     }
 
@@ -62,17 +62,19 @@ async function uploadToBucket(
       data: { publicUrl },
     } = supabase.storage.from(bucketName).getPublicUrl(data.path);
 
+    console.info(`[Storage Upload Success] File berhasil diupload ke "${bucketName}/${data.path}"`);
+
     return {
       url: publicUrl,
       path: data.path,
     };
   } catch (err: any) {
-    console.warn("Storage exception, using fallback data URL:", err.message);
+    console.error(`[Storage Upload Exception] Terjadi exception saat upload ke "${bucketName}":`, err);
     const base64Url = await fileToBase64(file);
     return {
       url: base64Url,
       path: fileName,
-      error: err.message,
+      error: err?.message || "Terjadi error saat upload ke storage",
     };
   }
 }

@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { X, Upload, Camera, PlusCircle, Trash, Check } from "lucide-react";
+import React, { useRef, useState } from "react";
+import { X, Upload, Camera, PlusCircle, Trash, Check, AlertCircle, Sparkles } from "lucide-react";
 import { CarFormData } from "../../types";
 
 interface AdminCarModalProps {
@@ -12,6 +12,7 @@ interface AdminCarModalProps {
   isUploadingMain: boolean;
   isUploadingGallery: boolean;
   submitting: boolean;
+  hasDraft?: boolean;
   onClose: () => void;
   onSubmit: (e: React.FormEvent) => void;
   onMainImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -31,6 +32,7 @@ export default function AdminCarModal({
   isUploadingMain,
   isUploadingGallery,
   submitting,
+  hasDraft = false,
   onClose,
   onSubmit,
   onMainImageUpload,
@@ -41,23 +43,97 @@ export default function AdminCarModal({
 }: AdminCarModalProps) {
   const mainImageInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setValidationError(null);
+
+    // Client-side validations with clear feedback
+    if (!carFormData.name.trim()) {
+      setValidationError("Nama Unit / Judul kendaraan wajib diisi.");
+      return;
+    }
+    if (!carFormData.model.trim()) {
+      setValidationError("Sub-judul / Tipe Detail kendaraan wajib diisi.");
+      return;
+    }
+    if (!carFormData.brand.trim()) {
+      setValidationError("Merek / Brand kendaraan wajib diisi.");
+      return;
+    }
+    if (!carFormData.year || carFormData.year < 1990 || carFormData.year > 2035) {
+      setValidationError("Tahun pembuatan harus berada di antara 1990 dan 2035.");
+      return;
+    }
+    if (!carFormData.price || carFormData.price <= 0) {
+      setValidationError("Harga Jual kendaraan wajib diisi dengan angka positif.");
+      return;
+    }
+    if (carFormData.mileage === undefined || carFormData.mileage === null || carFormData.mileage < 0) {
+      setValidationError("Kilometer / Odometer harus diisi dengan angka minimal 0.");
+      return;
+    }
+    if (!carFormData.fuel_type.trim()) {
+      setValidationError("Bahan Bakar kendaraan wajib diisi.");
+      return;
+    }
+    if (!carFormData.color.trim()) {
+      setValidationError("Warna Eksterior kendaraan wajib diisi.");
+      return;
+    }
+    if (!carFormData.engine.trim()) {
+      setValidationError("Kapasitas Mesin kendaraan wajib diisi.");
+      return;
+    }
+    if (!carFormData.badge.trim()) {
+      setValidationError("Badge / Tag kendaraan wajib diisi.");
+      return;
+    }
+    if (!carFormData.tax_status.trim()) {
+      setValidationError("Status Pajak kendaraan wajib diisi.");
+      return;
+    }
+    if (!carFormData.location.trim()) {
+      setValidationError("Lokasi Unit kendaraan wajib diisi.");
+      return;
+    }
+    if (!carFormData.description.trim()) {
+      setValidationError("Deskripsi Lengkap Kondisi Mobil wajib diisi.");
+      return;
+    }
+    if (!carFormData.main_image || !carFormData.main_image.trim()) {
+      setValidationError("Silakan unggah atau sediakan minimal 1 Foto Utama kendaraan terlebih dahulu.");
+      return;
+    }
+
+    // Call external submit handler
+    onSubmit(e);
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       <div className="bg-[#141519] border border-[#272A33] max-w-4xl w-full p-6 sm:p-8 my-8 shadow-2xl relative max-h-[92vh] overflow-y-auto">
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 text-neutral-400 hover:text-white p-1 cursor-pointer"
+          className="absolute top-5 right-5 text-neutral-400 hover:text-white p-1 cursor-pointer transition-colors"
+          title="Tutup Modal"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
           <span className="text-[10px] font-mono tracking-widest text-[#D4AF37] uppercase bg-[#D4AF37]/10 px-2 py-0.5 border border-[#D4AF37]/30">
             INVENTORY MANAGEMENT
           </span>
+          {!editingCarId && hasDraft && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 border border-emerald-800/40">
+              <Sparkles className="w-3 h-3" />
+              Auto-Save Aktif (Draft Tersimpan)
+            </span>
+          )}
         </div>
         <h3 className="text-lg sm:text-xl font-semibold uppercase tracking-wider text-white">
           {editingCarId ? "Edit Spesifikasi Unit Mobil" : "Tambah Unit Mobil Baru"}
@@ -66,7 +142,22 @@ export default function AdminCarModal({
           Lengkapi data spesifikasi kendaraan secara presisi sesuai yang tampil pada katalog dan halaman detail unit.
         </p>
 
-        <form onSubmit={onSubmit} className="space-y-6 text-xs">
+        {/* Validation Warning Alert in Modal */}
+        {validationError && (
+          <div className="mb-6 p-3 bg-red-950/60 border border-red-500 text-red-200 text-xs flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+            <div className="flex-1 font-mono">{validationError}</div>
+            <button
+              type="button"
+              onClick={() => setValidationError(null)}
+              className="text-neutral-400 hover:text-white cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        <form onSubmit={handleFormSubmit} className="space-y-6 text-xs">
           {/* SECTION A: INFORMASI UTAMA & HARGA */}
           <div className="p-4 bg-[#18191E] border border-white/5 space-y-4">
             <span className="text-[11px] font-mono font-semibold tracking-wider text-[#D4AF37] uppercase block">
@@ -83,7 +174,10 @@ export default function AdminCarModal({
                   required
                   placeholder="Contoh: Honda Civic Turbo"
                   value={carFormData.name}
-                  onChange={(e) => setCarFormData({ ...carFormData, name: e.target.value })}
+                  onChange={(e) => {
+                    setValidationError(null);
+                    setCarFormData({ ...carFormData, name: e.target.value });
+                  }}
                   className="w-full bg-[#121316] border border-white/10 px-3 py-2 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:outline-none"
                 />
               </div>
@@ -96,7 +190,10 @@ export default function AdminCarModal({
                   required
                   placeholder="Contoh: Civic 1.5 VTEC Turbo Sedan"
                   value={carFormData.model}
-                  onChange={(e) => setCarFormData({ ...carFormData, model: e.target.value })}
+                  onChange={(e) => {
+                    setValidationError(null);
+                    setCarFormData({ ...carFormData, model: e.target.value });
+                  }}
                   className="w-full bg-[#121316] border border-white/10 px-3 py-2 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:outline-none"
                 />
               </div>
@@ -112,7 +209,10 @@ export default function AdminCarModal({
                   required
                   placeholder="Contoh: Honda / Toyota / BMW"
                   value={carFormData.brand}
-                  onChange={(e) => setCarFormData({ ...carFormData, brand: e.target.value })}
+                  onChange={(e) => {
+                    setValidationError(null);
+                    setCarFormData({ ...carFormData, brand: e.target.value });
+                  }}
                   className="w-full bg-[#121316] border border-white/10 px-3 py-2 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:outline-none"
                 />
               </div>
@@ -124,9 +224,12 @@ export default function AdminCarModal({
                   type="number"
                   required
                   min={1990}
-                  max={2030}
-                  value={carFormData.year}
-                  onChange={(e) => setCarFormData({ ...carFormData, year: Number(e.target.value) })}
+                  max={2035}
+                  value={carFormData.year || ""}
+                  onChange={(e) => {
+                    setValidationError(null);
+                    setCarFormData({ ...carFormData, year: Number(e.target.value) });
+                  }}
                   className="w-full bg-[#121316] border border-white/10 px-3 py-2 text-white focus:border-[#D4AF37] focus:outline-none"
                 />
               </div>
@@ -137,10 +240,13 @@ export default function AdminCarModal({
                 <input
                   type="number"
                   required
-                  step={1000000}
+                  step="any"
                   placeholder="Contoh: 478000000"
-                  value={carFormData.price}
-                  onChange={(e) => setCarFormData({ ...carFormData, price: Number(e.target.value) })}
+                  value={carFormData.price || ""}
+                  onChange={(e) => {
+                    setValidationError(null);
+                    setCarFormData({ ...carFormData, price: Number(e.target.value) });
+                  }}
                   className="w-full bg-[#121316] border border-white/10 px-3 py-2 text-white focus:border-[#D4AF37] focus:outline-none font-mono"
                 />
                 <span className="text-[10px] text-[#D4AF37] font-mono mt-0.5 block">
@@ -164,9 +270,13 @@ export default function AdminCarModal({
                 <input
                   type="number"
                   required
+                  step="any"
                   placeholder="Contoh: 28400"
-                  value={carFormData.mileage}
-                  onChange={(e) => setCarFormData({ ...carFormData, mileage: Number(e.target.value) })}
+                  value={carFormData.mileage !== undefined ? carFormData.mileage : ""}
+                  onChange={(e) => {
+                    setValidationError(null);
+                    setCarFormData({ ...carFormData, mileage: Number(e.target.value) });
+                  }}
                   className="w-full bg-[#121316] border border-white/10 px-3 py-2 text-white focus:border-[#D4AF37] focus:outline-none font-mono"
                 />
               </div>
@@ -198,7 +308,10 @@ export default function AdminCarModal({
                   required
                   placeholder="Contoh: Bensin (Pertamax / Shell)"
                   value={carFormData.fuel_type}
-                  onChange={(e) => setCarFormData({ ...carFormData, fuel_type: e.target.value })}
+                  onChange={(e) => {
+                    setValidationError(null);
+                    setCarFormData({ ...carFormData, fuel_type: e.target.value });
+                  }}
                   className="w-full bg-[#121316] border border-white/10 px-3 py-2 text-white focus:border-[#D4AF37] focus:outline-none"
                 />
               </div>
@@ -214,7 +327,10 @@ export default function AdminCarModal({
                   required
                   placeholder="Contoh: Sonic Gray Pearl (Coating)"
                   value={carFormData.color}
-                  onChange={(e) => setCarFormData({ ...carFormData, color: e.target.value })}
+                  onChange={(e) => {
+                    setValidationError(null);
+                    setCarFormData({ ...carFormData, color: e.target.value });
+                  }}
                   className="w-full bg-[#121316] border border-white/10 px-3 py-2 text-white focus:border-[#D4AF37] focus:outline-none"
                 />
               </div>
@@ -228,7 +344,10 @@ export default function AdminCarModal({
                   required
                   placeholder="Contoh: 1.5L DOHC VTEC Turbocharged"
                   value={carFormData.engine}
-                  onChange={(e) => setCarFormData({ ...carFormData, engine: e.target.value })}
+                  onChange={(e) => {
+                    setValidationError(null);
+                    setCarFormData({ ...carFormData, engine: e.target.value });
+                  }}
                   className="w-full bg-[#121316] border border-white/10 px-3 py-2 text-white focus:border-[#D4AF37] focus:outline-none"
                 />
               </div>
@@ -242,7 +361,10 @@ export default function AdminCarModal({
                   required
                   placeholder="SPORTY DAILY / EXECUTIVE SUV"
                   value={carFormData.badge}
-                  onChange={(e) => setCarFormData({ ...carFormData, badge: e.target.value })}
+                  onChange={(e) => {
+                    setValidationError(null);
+                    setCarFormData({ ...carFormData, badge: e.target.value });
+                  }}
                   className="w-full bg-[#121316] border border-white/10 px-3 py-2 text-white focus:border-[#D4AF37] focus:outline-none"
                 />
               </div>
@@ -258,7 +380,10 @@ export default function AdminCarModal({
                   required
                   placeholder="Contoh: Pajak Hidup Panjang (s/d Nov 2025)"
                   value={carFormData.tax_status}
-                  onChange={(e) => setCarFormData({ ...carFormData, tax_status: e.target.value })}
+                  onChange={(e) => {
+                    setValidationError(null);
+                    setCarFormData({ ...carFormData, tax_status: e.target.value });
+                  }}
                   className="w-full bg-[#121316] border border-white/10 px-3 py-2 text-white focus:border-[#D4AF37] focus:outline-none"
                 />
               </div>
@@ -285,7 +410,10 @@ export default function AdminCarModal({
                   required
                   placeholder="Contoh: Langkat / Medan"
                   value={carFormData.location}
-                  onChange={(e) => setCarFormData({ ...carFormData, location: e.target.value })}
+                  onChange={(e) => {
+                    setValidationError(null);
+                    setCarFormData({ ...carFormData, location: e.target.value });
+                  }}
                   className="w-full bg-[#121316] border border-white/10 px-3 py-2 text-white focus:border-[#D4AF37] focus:outline-none"
                 />
               </div>
@@ -340,15 +468,30 @@ export default function AdminCarModal({
                     onChange={onMainImageUpload}
                     className="hidden"
                   />
-                  <button
-                    type="button"
-                    disabled={isUploadingMain}
-                    onClick={() => mainImageInputRef.current?.click()}
-                    className="inline-flex items-center gap-2 px-4 py-2 border border-[#D4AF37] bg-[#D4AF37]/10 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-black font-semibold uppercase tracking-wider text-xs transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    <Upload className="w-4 h-4" />
-                    <span>{isUploadingMain ? "Mengunggah foto..." : "Unggah File Foto Utama"}</span>
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      disabled={isUploadingMain}
+                      onClick={() => mainImageInputRef.current?.click()}
+                      className="inline-flex items-center gap-2 px-4 py-2 border border-[#D4AF37] bg-[#D4AF37]/10 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-black font-semibold uppercase tracking-wider text-xs transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span>{isUploadingMain ? "Mengunggah foto..." : "Unggah File Foto Utama"}</span>
+                    </button>
+                  </div>
+
+                  {/* Optional direct URL input if user has online image link */}
+                  <input
+                    type="text"
+                    placeholder="Atau tempel URL gambar eksternal (https://...)"
+                    value={carFormData.main_image}
+                    onChange={(e) => {
+                      setValidationError(null);
+                      setCarFormData({ ...carFormData, main_image: e.target.value });
+                    }}
+                    className="w-full bg-[#121316] border border-white/10 px-3 py-1.5 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:outline-none text-xs font-mono"
+                  />
+
                   <p className="text-[11px] text-neutral-400 font-light">
                     Mendukung format PNG, JPG, JPEG, atau WebP. Gambar otomatis disimpan ke storage dan menghasilkan tautan publik.
                   </p>
@@ -432,7 +575,10 @@ export default function AdminCarModal({
                 rows={4}
                 required
                 value={carFormData.description}
-                onChange={(e) => setCarFormData({ ...carFormData, description: e.target.value })}
+                onChange={(e) => {
+                  setValidationError(null);
+                  setCarFormData({ ...carFormData, description: e.target.value });
+                }}
                 placeholder="Jelaskan kondisi riil eksterior, interior, riwayat perawatan di bengkel resmi, kepemilikan tangan pertama, dan jaminan bebas tabrak/banjir..."
                 className="w-full bg-[#121316] border border-white/10 px-3 py-2 text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:outline-none"
               ></textarea>

@@ -32,6 +32,79 @@ import AdminPortfolioGrid from "./admin/AdminPortfolioGrid";
 import AdminCarModal from "./admin/AdminCarModal";
 import AdminPortfolioModal from "./admin/AdminPortfolioModal";
 
+const CAR_DRAFT_KEY = "admin_car_form_draft_v1";
+const PORTFOLIO_DRAFT_KEY = "admin_portfolio_form_draft_v1";
+
+const DEFAULT_CAR_FORM_DATA: CarFormData = {
+  name: "",
+  model: "",
+  brand: "",
+  year: new Date().getFullYear(),
+  price: 350000000,
+  mileage: 20000,
+  transmission: "Automatic (CVT)",
+  fuel_type: "Bensin",
+  color: "Hitam Metalik",
+  engine: "1.5L Turbo",
+  tax_status: "Pajak Hidup",
+  plate: "BK (Sumatera Utara)",
+  location: "Langkat / Medan",
+  badge: "AVAILABLE",
+  description:
+    "Unit terawat istimewa dengan service record resmi, telah lolos inspeksi 150+ titik dan siap pakai.",
+  main_image:
+    "https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?q=80&w=1400&auto=format&fit=crop",
+  highlights: [
+    "Lolos Inspeksi 150+ Titik Ketat",
+    "Odometer Asli (Garansi Bukan Putaran)",
+    "Bukan Bekas Tabrakan & Bebas Banjir 100%",
+  ],
+  gallery: [],
+};
+
+const DEFAULT_PORTFOLIO_FORM_DATA: PortfolioFormData = {
+  title: "",
+  category: "Detailing",
+  badge: "WORK / 01",
+  subtitle: "High precision automotive perfection.",
+  image_url:
+    "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?q=80&w=1200&auto=format&fit=crop",
+  description:
+    "Hasil pengerjaan berstandar tinggi dengan material impor berkualitas dan garansi resmi.",
+  car_model: "Honda Civic Sedan",
+  treatment_list: [
+    "Perawatan Komprehensif",
+    "Material Premium Teruji",
+    "Garansi Resmi Hasil Pengerjaan",
+  ],
+};
+
+function getInitialCarDraft(): CarFormData {
+  try {
+    const saved = localStorage.getItem(CAR_DRAFT_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return { ...DEFAULT_CAR_FORM_DATA, ...parsed };
+    }
+  } catch (e) {
+    console.warn("Gagal membaca draft mobil dari localStorage:", e);
+  }
+  return DEFAULT_CAR_FORM_DATA;
+}
+
+function getInitialPortfolioDraft(): PortfolioFormData {
+  try {
+    const saved = localStorage.getItem(PORTFOLIO_DRAFT_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return { ...DEFAULT_PORTFOLIO_FORM_DATA, ...parsed };
+    }
+  } catch (e) {
+    console.warn("Gagal membaca draft portofolio dari localStorage:", e);
+  }
+  return DEFAULT_PORTFOLIO_FORM_DATA;
+}
+
 interface AdminDashboardProps {
   userEmail: string;
   onLogout: () => void;
@@ -46,31 +119,9 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
   const [carModalOpen, setCarModalOpen] = useState(false);
   const [editingCarId, setEditingCarId] = useState<string | null>(null);
 
-  // Car Form Data
-  const [carFormData, setCarFormData] = useState<CarFormData>({
-    name: "",
-    model: "",
-    brand: "",
-    year: 2022,
-    price: 450000000,
-    mileage: 28000,
-    transmission: "Automatic (CVT)",
-    fuel_type: "Bensin",
-    color: "",
-    engine: "",
-    tax_status: "Pajak Hidup Panjang",
-    plate: "BK (Sumatera Utara)",
-    location: "Langkat / Medan",
-    badge: "SPORTY DAILY",
-    description: "",
-    main_image: "",
-    highlights: [
-      "Service Record Rutin Bengkel Resmi",
-      "Odometer Asli (Garansi Bukan Putaran)",
-      "Bukan Bekas Tabrakan & Bebas Banjir 100%",
-    ],
-    gallery: [],
-  });
+  // Car Form Data with Draft persistence
+  const [carFormData, setCarFormData] = useState<CarFormData>(getInitialCarDraft);
+  const [hasCarDraft, setHasCarDraft] = useState<boolean>(() => Boolean(localStorage.getItem(CAR_DRAFT_KEY)));
 
   const [newHighlightInput, setNewHighlightInput] = useState("");
   const [isUploadingMain, setIsUploadingMain] = useState(false);
@@ -83,31 +134,40 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
   const [editingPortfolioId, setEditingPortfolioId] = useState<string | null>(null);
   const [isUploadingPortfolioImg, setIsUploadingPortfolioImg] = useState(false);
 
-  const [portfolioFormData, setPortfolioFormData] = useState<PortfolioFormData>({
-    title: "",
-    category: "Detailing",
-    badge: "WORK / 01",
-    subtitle: "Crafted to perfection.",
-    image_url:
-      "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?q=80&w=1200&auto=format&fit=crop",
-    description:
-      "Hasil pengerjaan berstandar tinggi dengan material berkualitas dan ketelitian maksimal.",
-    car_model: "Honda Civic / Toyota Fortuner",
-    treatment_list: [
-      "Perawatan Komprehensif",
-      "Material Premium Teruji",
-      "Garansi Resmi Hasil Pengerjaan",
-    ],
-  });
+  // Portfolio Form Data with Draft persistence
+  const [portfolioFormData, setPortfolioFormData] = useState<PortfolioFormData>(getInitialPortfolioDraft);
+  const [hasPortfolioDraft, setHasPortfolioDraft] = useState<boolean>(() => Boolean(localStorage.getItem(PORTFOLIO_DRAFT_KEY)));
 
   // Feedback notifications & status
   const [alert, setAlert] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Auto clear alert after 5 seconds
+  // Auto-Save Draft to LocalStorage whenever carFormData changes (ONLY when adding new car, not when editing)
+  useEffect(() => {
+    if (editingCarId) return; // Do not overwrite new car draft while editing existing unit
+    try {
+      localStorage.setItem(CAR_DRAFT_KEY, JSON.stringify(carFormData));
+      setHasCarDraft(true);
+    } catch (err) {
+      console.warn("Gagal menyimpan auto-save mobil:", err);
+    }
+  }, [carFormData, editingCarId]);
+
+  // Auto-Save Draft to LocalStorage whenever portfolioFormData changes (ONLY when adding new portfolio)
+  useEffect(() => {
+    if (editingPortfolioId) return; // Do not overwrite draft while editing existing item
+    try {
+      localStorage.setItem(PORTFOLIO_DRAFT_KEY, JSON.stringify(portfolioFormData));
+      setHasPortfolioDraft(true);
+    } catch (err) {
+      console.warn("Gagal menyimpan auto-save portofolio:", err);
+    }
+  }, [portfolioFormData, editingPortfolioId]);
+
+  // Auto clear alert after 6 seconds
   useEffect(() => {
     if (alert) {
-      const timer = setTimeout(() => setAlert(null), 5000);
+      const timer = setTimeout(() => setAlert(null), 6000);
       return () => clearTimeout(timer);
     }
   }, [alert]);
@@ -117,6 +177,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
     setLoadingCars(true);
     const { data, error } = await fetchCarsFromSupabase();
     if (error) {
+      console.error("[Database Error] Gagal memuat unit mobil:", error);
       setAlert({
         type: "error",
         text: `Gagal memuat data mobil dari database: ${error.message}`,
@@ -133,6 +194,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
     setLoadingPortfolios(true);
     const { data, error } = await fetchPortfoliosFromSupabase();
     if (error) {
+      console.error("[Database Error] Gagal memuat portofolio:", error);
       setAlert({
         type: "error",
         text: `Gagal memuat portofolio dari database: ${error.message}`,
@@ -149,14 +211,29 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
     loadPortfolios();
   }, [loadCars, loadPortfolios]);
 
-  // Handle Main Image File Upload to Supabase Storage
+  // Handle Main Image File Upload to Storage
   const handleMainImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsUploadingMain(true);
     try {
+      console.info(`[Upload] Mengunggah foto utama "${file.name}"...`);
       const result = await uploadCarImage(file, "cars/main");
+
+      if (result.error) {
+        console.warn(`[Upload Warning] Upload storage mengembalikan peringatan: ${result.error}`);
+        setAlert({
+          type: "error",
+          text: `Peringatan Upload Foto: ${result.error}. Gambar tetap dimuat menggunakan data URL lokal.`,
+        });
+      } else {
+        setAlert({
+          type: "success",
+          text: "Foto utama berhasil diunggah ke storage!",
+        });
+      }
+
       setCarFormData((prev) => ({
         ...prev,
         main_image: result.url,
@@ -165,18 +242,16 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
             ? [{ title: prev.name || "Foto Depan", url: result.url, tag: "Depan" }]
             : prev.gallery,
       }));
-
-      setAlert({
-        type: "success",
-        text: "Foto utama berhasil diunggah!",
-      });
     } catch (err: any) {
+      console.error("[Upload Error] Gagal mengunggah foto utama:", err);
       setAlert({
         type: "error",
-        text: `Gagal mengunggah foto: ${err.message}`,
+        text: `Gagal mengunggah foto utama: ${err?.message || "Kesalahan jaringan"}`,
       });
     } finally {
       setIsUploadingMain(false);
+      // Reset input value so same file can be re-selected if needed
+      e.target.value = "";
     }
   };
 
@@ -188,7 +263,22 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
     setIsUploadingGallery(true);
     try {
       const fileList = Array.from(files);
+      console.info(`[Upload] Mengunggah ${fileList.length} foto galeri tambahan...`);
       const results = await uploadMultipleCarImages(fileList, "cars/gallery");
+
+      const hasErrors = results.some((r) => r.error);
+      if (hasErrors) {
+        console.warn("[Upload Warning] Sebagian foto galeri mengalami kendala upload.");
+        setAlert({
+          type: "error",
+          text: "Sebagian foto galeri diunggah dengan fallback lokal karena kendala storage.",
+        });
+      } else {
+        setAlert({
+          type: "success",
+          text: `${results.length} foto galeri tambahan berhasil diunggah!`,
+        });
+      }
 
       const newPhotos: GalleryPhotoItem[] = results.map((res, i) => {
         const tagOptions = ["Samping", "Belakang", "Interior", "Dashboard", "Mesin", "Detail"];
@@ -204,44 +294,54 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
         ...prev,
         gallery: [...prev.gallery, ...newPhotos],
       }));
-
-      setAlert({
-        type: "success",
-        text: `${results.length} foto galeri tambahan berhasil diunggah!`,
-      });
     } catch (err: any) {
+      console.error("[Upload Error] Gagal mengunggah galeri tambahan:", err);
       setAlert({
         type: "error",
-        text: `Gagal mengunggah galeri: ${err.message}`,
+        text: `Gagal mengunggah galeri: ${err?.message || "Kesalahan jaringan"}`,
       });
     } finally {
       setIsUploadingGallery(false);
+      e.target.value = "";
     }
   };
 
-  // Handle Portfolio Single Image Upload to Supabase Storage
+  // Handle Portfolio Single Image Upload to Storage
   const handlePortfolioImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsUploadingPortfolioImg(true);
     try {
+      console.info(`[Upload] Mengunggah foto portofolio "${file.name}"...`);
       const result = await uploadPortfolioImage(file, "portfolio");
+
+      if (result.error) {
+        console.warn(`[Upload Warning] Upload portofolio mengembalikan peringatan: ${result.error}`);
+        setAlert({
+          type: "error",
+          text: `Peringatan Upload Foto: ${result.error}`,
+        });
+      } else {
+        setAlert({
+          type: "success",
+          text: "Foto portofolio berhasil diunggah ke storage!",
+        });
+      }
+
       setPortfolioFormData((prev) => ({
         ...prev,
         image_url: result.url,
       }));
-      setAlert({
-        type: "success",
-        text: "Foto portofolio berhasil diunggah!",
-      });
     } catch (err: any) {
+      console.error("[Upload Error] Gagal mengunggah foto portofolio:", err);
       setAlert({
         type: "error",
-        text: `Gagal mengunggah foto portofolio: ${err.message}`,
+        text: `Gagal mengunggah foto portofolio: ${err?.message || "Kesalahan jaringan"}`,
       });
     } finally {
       setIsUploadingPortfolioImg(false);
+      e.target.value = "";
     }
   };
 
@@ -272,10 +372,12 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
     }));
   };
 
-  // Save / Update Car in Supabase
+  // Save / Update Car in Database
   const handleSaveCar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!carFormData.main_image) {
+    console.info("[Submit Car] Memulai proses simpan unit mobil...", carFormData);
+
+    if (!carFormData.main_image || !carFormData.main_image.trim()) {
       setAlert({
         type: "error",
         text: "Silakan unggah atau isi minimal 1 Foto Utama kendaraan terlebih dahulu.",
@@ -288,8 +390,10 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
 
     try {
       if (editingCarId) {
+        console.info(`[Update Car] Memperbarui unit ID "${editingCarId}"...`);
         const { error } = await updateCarInSupabase(editingCarId, carFormData);
         if (error) {
+          console.error("[Update Car Error]", error);
           setAlert({
             type: "error",
             text: `Gagal memperbarui unit di database: ${error.message}`,
@@ -304,24 +408,41 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
           await loadCars();
         }
       } else {
+        console.info("[Insert Car] Menyimpan unit baru ke database...", carFormData);
         const { error } = await insertCarToSupabase(carFormData);
         if (error) {
+          console.error("[Insert Car Error]", error);
           setAlert({
             type: "error",
             text: `Gagal menambahkan unit ke database: ${error.message}`,
           });
         } else {
+          // Success: Clear localStorage draft ONLY when successfully submitted
+          try {
+            localStorage.removeItem(CAR_DRAFT_KEY);
+            setHasCarDraft(false);
+            console.info("[Draft Cleared] Draft mobil berhasil dihapus dari localStorage setelah sukses submit.");
+          } catch (storageErr) {
+            console.warn("Gagal membersihkan draft localStorage:", storageErr);
+          }
+
           setAlert({
             type: "success",
-            text: `Unit mobil baru "${carFormData.name}" berhasil disimpan!`,
+            text: `Unit mobil baru "${carFormData.name}" berhasil disimpan ke katalog!`,
           });
           setCarModalOpen(false);
           setEditingCarId(null);
+          // Reset form data to default template
+          setCarFormData(DEFAULT_CAR_FORM_DATA);
           await loadCars();
         }
       }
     } catch (err: any) {
-      setAlert({ type: "error", text: `Terjadi kendala: ${err.message}` });
+      console.error("[Save Car Exception]", err);
+      setAlert({
+        type: "error",
+        text: `Terjadi kendala saat menyimpan unit: ${err?.message || "Kesalahan tidak terduga"}`,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -337,6 +458,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
     try {
       const { error } = await deleteCarFromSupabase(id);
       if (error) {
+        console.error("[Delete Car Error]", error);
         setAlert({
           type: "error",
           text: `Gagal menghapus unit: ${error.message}`,
@@ -349,6 +471,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
         await loadCars();
       }
     } catch (err: any) {
+      console.error("[Delete Car Exception]", err);
       setAlert({ type: "error", text: `Gagal menghapus: ${err.message}` });
     }
   };
@@ -379,48 +502,34 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
     setCarModalOpen(true);
   };
 
-  // Open Add Car Modal
+  // Open Add Car Modal (reloads draft if present, else defaults)
   const openAddCar = () => {
     setEditingCarId(null);
-    setCarFormData({
-      name: "",
-      model: "",
-      brand: "",
-      year: new Date().getFullYear(),
-      price: 350000000,
-      mileage: 20000,
-      transmission: "Automatic",
-      fuel_type: "Bensin",
-      color: "Hitam Metalik",
-      engine: "1.5L Turbo",
-      tax_status: "Pajak Hidup",
-      plate: "BK (Sumatera Utara)",
-      location: "Langkat / Medan",
-      badge: "AVAILABLE",
-      description:
-        "Unit terawat istimewa dengan service record resmi, telah lolos inspeksi 150+ titik dan siap pakai.",
-      main_image:
-        "https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?q=80&w=1400&auto=format&fit=crop",
-      highlights: [
-        "Lolos Inspeksi 150+ Titik Ketat",
-        "Odometer Asli (Garansi Bukan Putaran)",
-        "Bukan Bekas Tabrakan & Bebas Banjir 100%",
-      ],
-      gallery: [],
-    });
+    const draft = getInitialCarDraft();
+    setCarFormData(draft);
     setCarModalOpen(true);
   };
 
-  // Save / Update Portfolio in Supabase
+  // Cancel / Close Car Modal - DOES NOT CLEAR DRAFT so user doesn't lose work
+  const handleCloseCarModal = () => {
+    setCarModalOpen(false);
+    setEditingCarId(null);
+  };
+
+  // Save / Update Portfolio in Database
   const handleSavePortfolio = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.info("[Submit Portfolio] Memulai proses simpan portofolio...", portfolioFormData);
+
     setSubmitting(true);
     setAlert(null);
 
     try {
       if (editingPortfolioId) {
+        console.info(`[Update Portfolio] Memperbarui portofolio ID "${editingPortfolioId}"...`);
         const { error } = await updatePortfolioInSupabase(editingPortfolioId, portfolioFormData);
         if (error) {
+          console.error("[Update Portfolio Error]", error);
           setAlert({
             type: "error",
             text: `Gagal memperbarui portofolio di database: ${error.message}`,
@@ -435,24 +544,41 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
           await loadPortfolios();
         }
       } else {
+        console.info("[Insert Portfolio] Menyimpan portofolio baru ke database...", portfolioFormData);
         const { error } = await insertPortfolioToSupabase(portfolioFormData);
         if (error) {
+          console.error("[Insert Portfolio Error]", error);
           setAlert({
             type: "error",
             text: `Gagal menambahkan portofolio ke database: ${error.message}`,
           });
         } else {
+          // Success: Clear localStorage draft ONLY when successfully submitted
+          try {
+            localStorage.removeItem(PORTFOLIO_DRAFT_KEY);
+            setHasPortfolioDraft(false);
+            console.info("[Draft Cleared] Draft portofolio berhasil dihapus setelah submit.");
+          } catch (storageErr) {
+            console.warn("Gagal membersihkan draft portofolio:", storageErr);
+          }
+
           setAlert({
             type: "success",
             text: `Portofolio "${portfolioFormData.title}" berhasil disimpan!`,
           });
           setPortfolioModalOpen(false);
           setEditingPortfolioId(null);
+          // Reset portfolio form to default template
+          setPortfolioFormData(DEFAULT_PORTFOLIO_FORM_DATA);
           await loadPortfolios();
         }
       }
     } catch (err: any) {
-      setAlert({ type: "error", text: `Gagal menyimpan: ${err.message}` });
+      console.error("[Save Portfolio Exception]", err);
+      setAlert({
+        type: "error",
+        text: `Gagal menyimpan portofolio: ${err?.message || "Kesalahan jaringan"}`,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -468,6 +594,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
     try {
       const { error } = await deletePortfolioFromSupabase(id);
       if (error) {
+        console.error("[Delete Portfolio Error]", error);
         setAlert({
           type: "error",
           text: `Gagal menghapus portofolio: ${error.message}`,
@@ -480,6 +607,7 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
         await loadPortfolios();
       }
     } catch (err: any) {
+      console.error("[Delete Portfolio Exception]", err);
       setAlert({ type: "error", text: `Gagal menghapus: ${err.message}` });
     }
   };
@@ -500,26 +628,21 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
     setPortfolioModalOpen(true);
   };
 
-  // Open Add Portfolio Modal
+  // Open Add Portfolio Modal (reloads draft if present)
   const openAddPortfolio = () => {
     setEditingPortfolioId(null);
+    const draft = getInitialPortfolioDraft();
     setPortfolioFormData({
-      title: "",
-      category: "Detailing",
-      badge: `WORK / 0${portfolios.length + 1}`,
-      subtitle: "High precision automotive perfection.",
-      image_url:
-        "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?q=80&w=1200&auto=format&fit=crop",
-      description:
-        "Hasil pengerjaan berstandar tinggi dengan material impor berkualitas dan garansi resmi.",
-      car_model: "Honda Civic Sedan",
-      treatment_list: [
-        "Perawatan Komprehensif",
-        "Material Premium Teruji",
-        "Garansi Resmi Hasil Pengerjaan",
-      ],
+      ...draft,
+      badge: draft.badge || `WORK / 0${portfolios.length + 1}`,
     });
     setPortfolioModalOpen(true);
+  };
+
+  // Cancel / Close Portfolio Modal
+  const handleClosePortfolioModal = () => {
+    setPortfolioModalOpen(false);
+    setEditingPortfolioId(null);
   };
 
   const configured = isSupabaseConfigured();
@@ -720,7 +843,8 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
         isUploadingMain={isUploadingMain}
         isUploadingGallery={isUploadingGallery}
         submitting={submitting}
-        onClose={() => setCarModalOpen(false)}
+        hasDraft={hasCarDraft}
+        onClose={handleCloseCarModal}
         onSubmit={handleSaveCar}
         onMainImageUpload={handleMainImageUpload}
         onGalleryUpload={handleGalleryUpload}
@@ -736,9 +860,10 @@ export default function AdminDashboard({ userEmail, onLogout }: AdminDashboardPr
         formData={portfolioFormData}
         setFormData={setPortfolioFormData}
         submitting={submitting}
+        hasDraft={hasPortfolioDraft}
         isUploadingImage={isUploadingPortfolioImg}
         onImageUpload={handlePortfolioImageUpload}
-        onClose={() => setPortfolioModalOpen(false)}
+        onClose={handleClosePortfolioModal}
         onSubmit={handleSavePortfolio}
       />
     </div>
