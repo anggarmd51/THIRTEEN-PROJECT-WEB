@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS public.cars (
   plate TEXT DEFAULT 'BK (Sumatera Utara)',
   location TEXT DEFAULT 'Langkat / Medan',
   main_image TEXT NOT NULL,
+  video_360_url TEXT DEFAULT '',
   description TEXT DEFAULT '',
   highlights JSONB DEFAULT '[]'::jsonb,
   gallery JSONB DEFAULT '[]'::jsonb,
@@ -98,22 +99,26 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('portfolio-photos', 'portfolio-photos', true)
 ON CONFLICT (id) DO NOTHING;
 
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('car-360-videos', 'car-360-videos', true)
+ON CONFLICT (id) DO NOTHING;
+
 -- Storage Objects Policies
 DROP POLICY IF EXISTS "Public access to car-photos" ON storage.objects;
 CREATE POLICY "Public access to car-photos" ON storage.objects
-  FOR SELECT USING (bucket_id IN ('car-photos', 'portfolio-photos'));
+  FOR SELECT USING (bucket_id IN ('car-photos', 'portfolio-photos', 'car-360-videos'));
 
 DROP POLICY IF EXISTS "Public upload to car-photos" ON storage.objects;
 CREATE POLICY "Public upload to car-photos" ON storage.objects
-  FOR INSERT WITH CHECK (bucket_id IN ('car-photos', 'portfolio-photos'));
+  FOR INSERT WITH CHECK (bucket_id IN ('car-photos', 'portfolio-photos', 'car-360-videos'));
 
 DROP POLICY IF EXISTS "Public update in car-photos" ON storage.objects;
 CREATE POLICY "Public update in car-photos" ON storage.objects
-  FOR UPDATE USING (bucket_id IN ('car-photos', 'portfolio-photos'));
+  FOR UPDATE USING (bucket_id IN ('car-photos', 'portfolio-photos', 'car-360-videos'));
 
 DROP POLICY IF EXISTS "Public delete in car-photos" ON storage.objects;
 CREATE POLICY "Public delete in car-photos" ON storage.objects
-  FOR DELETE USING (bucket_id IN ('car-photos', 'portfolio-photos'));
+  FOR DELETE USING (bucket_id IN ('car-photos', 'portfolio-photos', 'car-360-videos'));
 
 -- ==============================================================================
 -- 6. INITIAL SEED DATA (OPTIONAL: Jalankan jika ingin mengisi data awal langsung)

@@ -2,11 +2,22 @@ import { supabase } from "./supabase";
 
 export const CAR_STORAGE_BUCKET = "car-photos";
 export const PORTFOLIO_STORAGE_BUCKET = "portfolio-photos";
+export const CAR_360_STORAGE_BUCKET = "car-360-videos";
 
 export interface UploadResult {
   url: string;
   path: string;
   error?: string;
+}
+
+/**
+ * Uploads a 360-degree car video (.mp4) to Supabase Storage bucket 'car-360-videos'.
+ */
+export async function uploadCar360Video(
+  file: File,
+  folder = "videos"
+): Promise<UploadResult> {
+  return uploadToBucket(file, CAR_360_STORAGE_BUCKET, folder);
 }
 
 /**
@@ -62,19 +73,18 @@ async function uploadToBucket(
       data: { publicUrl },
     } = supabase.storage.from(bucketName).getPublicUrl(data.path);
 
-    console.info(`[Storage Upload Success] File berhasil diupload ke "${bucketName}/${data.path}"`);
-
     return {
       url: publicUrl,
       path: data.path,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error(`[Storage Upload Exception] Terjadi exception saat upload ke "${bucketName}":`, err);
     const base64Url = await fileToBase64(file);
+    const errMsg = err instanceof Error ? err.message : "Terjadi error saat upload ke storage";
     return {
       url: base64Url,
       path: fileName,
-      error: err?.message || "Terjadi error saat upload ke storage",
+      error: errMsg,
     };
   }
 }

@@ -12,7 +12,7 @@ import {
 /**
  * Normalizes Supabase car row into typed CarUnit for frontend presentation
  */
-export function buildCarPayload(formData: CarFormData): Record<string, any> {
+export function buildCarPayload(formData: CarFormData): Record<string, unknown> {
   const currentGallery: GalleryPhotoItem[] =
     Array.isArray(formData.gallery) && formData.gallery.length > 0
       ? formData.gallery
@@ -32,12 +32,13 @@ export function buildCarPayload(formData: CarFormData): Record<string, any> {
     plate: formData.plate || "",
     highlights: currentHighlights,
     gallery: currentGallery,
+    video_360_url: formData.video_360_url || "",
   };
 
   const rawDesc = (formData.description || "").replace(/<!--JSON_METADATA:[\s\S]*?-->/g, "").trim();
   const descWithMeta = `${rawDesc}\n\n<!--JSON_METADATA:${JSON.stringify(metadata)}-->`;
 
-  return {
+  const payload: Record<string, unknown> = {
     title: String(formData.name || formData.model || "Unit Mobil").trim(),
     category: String(formData.badge || formData.model || "AVAILABLE").trim(),
     price: Number(formData.price) || 0,
@@ -51,11 +52,17 @@ export function buildCarPayload(formData: CarFormData): Record<string, any> {
     description: descWithMeta,
     image_url: String(formData.main_image || "").trim(),
   };
+
+  if (formData.video_360_url) {
+    payload.video_360_url = String(formData.video_360_url).trim();
+  }
+
+  return payload;
 }
 
 export function mapRowToCarUnit(row: Partial<SupabaseCarRow>): CarUnit {
   let rawDesc = row.description || "";
-  let meta: Record<string, any> = {};
+  let meta: Record<string, unknown> = {};
   const metaMatch = rawDesc.match(/<!--JSON_METADATA:([\s\S]*?)-->/);
   if (metaMatch) {
     try {
@@ -70,6 +77,7 @@ export function mapRowToCarUnit(row: Partial<SupabaseCarRow>): CarUnit {
   const mileageVal = Number(row.mileage) || 0;
 
   let galleryArr: GalleryPhotoItem[] = [];
+  const metaGallery = Array.isArray(meta.gallery) ? (meta.gallery as GalleryPhotoItem[]) : null;
   if (Array.isArray(row.gallery)) {
     galleryArr = row.gallery as GalleryPhotoItem[];
   } else if (typeof row.gallery === "string") {
@@ -78,30 +86,46 @@ export function mapRowToCarUnit(row: Partial<SupabaseCarRow>): CarUnit {
     } catch {
       galleryArr = [];
     }
-  } else if (Array.isArray(meta.gallery)) {
-    galleryArr = meta.gallery;
+  } else if (metaGallery) {
+    galleryArr = metaGallery;
   }
 
+  const metaMainImage = typeof meta.main_image === "string" ? meta.main_image : undefined;
   const mainImg =
     row.main_image ||
     row.mainImage ||
     row.image_url ||
     row.imageUrl ||
-    meta.main_image ||
+    metaMainImage ||
     "https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?q=80&w=1400&auto=format&fit=crop";
 
-  const carName = row.name || row.title || meta.name || "Unit Mobil";
-  const carBrand = row.brand || meta.brand || "Umum";
-  const carModel = row.model || meta.model || row.title || row.name || "Sedan / SUV";
-  const carBadge = row.badge || meta.badge || row.category || "AVAILABLE";
-  const carEngine = row.engine || meta.engine || "Standar Mesin";
-  const carPlate = row.plate || meta.plate || "BK (Sumatera Utara)";
+  const metaName = typeof meta.name === "string" ? meta.name : undefined;
+  const metaBrand = typeof meta.brand === "string" ? meta.brand : undefined;
+  const metaModel = typeof meta.model === "string" ? meta.model : undefined;
+  const metaBadge = typeof meta.badge === "string" ? meta.badge : undefined;
+  const metaEngine = typeof meta.engine === "string" ? meta.engine : undefined;
+  const metaPlate = typeof meta.plate === "string" ? meta.plate : undefined;
+  const metaFuel = typeof meta.fuel_type === "string" ? meta.fuel_type : undefined;
+  const metaVideo360 =
+    typeof meta.video_360_url === "string"
+      ? meta.video_360_url
+      : typeof meta.video360Url === "string"
+      ? meta.video360Url
+      : undefined;
+
+  const carName = row.name || row.title || metaName || "Unit Mobil";
+  const carBrand = row.brand || metaBrand || "Umum";
+  const carModel = row.model || metaModel || row.title || row.name || "Sedan / SUV";
+  const carBadge = row.badge || metaBadge || row.category || "AVAILABLE";
+  const carEngine = row.engine || metaEngine || "Standar Mesin";
+  const carPlate = row.plate || metaPlate || "BK (Sumatera Utara)";
 
   if (galleryArr.length === 0) {
     galleryArr = [{ title: carName, url: mainImg, tag: "Utama" }];
   }
 
   let highlightsArr: string[] = [];
+  const metaHighlights = Array.isArray(meta.highlights) ? (meta.highlights as string[]) : null;
   if (Array.isArray(row.highlights)) {
     highlightsArr = row.highlights;
   } else if (typeof row.highlights === "string") {
@@ -110,12 +134,17 @@ export function mapRowToCarUnit(row: Partial<SupabaseCarRow>): CarUnit {
     } catch {
       highlightsArr = row.highlights.split("\n").filter(Boolean);
     }
-  } else if (Array.isArray(meta.highlights)) {
-    highlightsArr = meta.highlights;
+  } else if (metaHighlights) {
+    highlightsArr = metaHighlights;
   }
 
-  const fuel = row.fuel || row.fuel_type || row.fuelType || meta.fuel_type || "Bensin";
+  const fuel = row.fuel || row.fuel_type || row.fuelType || metaFuel || "Bensin";
   const tax = row.tax_status || row.taxStatus || "Pajak Hidup Panjang";
+  const video360 =
+    row.video_360_url ||
+    row.video360Url ||
+    metaVideo360 ||
+    "";
 
   return {
     id: String(row.id || `car-${Date.now()}`),
@@ -141,6 +170,8 @@ export function mapRowToCarUnit(row: Partial<SupabaseCarRow>): CarUnit {
     location: row.location || "Langkat / Medan",
     mainImage: mainImg,
     gallery: galleryArr,
+    video_360_url: video360,
+    video360Url: video360,
     description:
       rawDesc ||
       "Unit pilihan dengan inspeksi komprehensif, siap pakai tanpa kendala.",
@@ -219,39 +250,60 @@ export async function fetchCarsFromSupabase(): Promise<{ data: CarUnit[]; error:
 
     const mapped = (data || []).map(mapRowToCarUnit);
     return { data: mapped, error: null };
-  } catch (err: any) {
-    return { data: [], error: new Error(err.message || "Failed to fetch cars") };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to fetch cars";
+    return { data: [], error: new Error(message) };
   }
 }
 
-export async function insertCarToSupabase(formData: CarFormData): Promise<{ data: any; error: Error | null }> {
+export async function insertCarToSupabase(
+  formData: CarFormData
+): Promise<{ data: SupabaseCarRow | null; error: Error | null }> {
   const payload = buildCarPayload(formData);
 
   try {
-    const { data, error } = await supabase.from("cars").insert([payload]).select().single();
+    let { data, error } = await supabase.from("cars").insert([payload]).select().single();
+    if (error && (error.code === "PGRST204" || error.message?.includes("video_360_url"))) {
+      const fallbackPayload = { ...payload };
+      delete fallbackPayload.video_360_url;
+      const retry = await supabase.from("cars").insert([fallbackPayload]).select().single();
+      data = retry.data;
+      error = retry.error;
+    }
+
     if (error) {
       return { data: null, error: new Error(error.message) };
     }
-    return { data, error: null };
-  } catch (err: any) {
-    return { data: null, error: new Error(err.message || "Gagal menyimpan mobil ke Supabase") };
+    return { data: (data as SupabaseCarRow) || null, error: null };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Gagal menyimpan mobil ke Supabase";
+    return { data: null, error: new Error(message) };
   }
 }
 
 export async function updateCarInSupabase(
   id: string,
   formData: CarFormData
-): Promise<{ data: any; error: Error | null }> {
+): Promise<{ data: SupabaseCarRow | null; error: Error | null }> {
   const payload = buildCarPayload(formData);
 
   try {
-    const { data, error } = await supabase.from("cars").update(payload).eq("id", id).select().single();
+    let { data, error } = await supabase.from("cars").update(payload).eq("id", id).select().single();
+    if (error && (error.code === "PGRST204" || error.message?.includes("video_360_url"))) {
+      const fallbackPayload = { ...payload };
+      delete fallbackPayload.video_360_url;
+      const retry = await supabase.from("cars").update(fallbackPayload).eq("id", id).select().single();
+      data = retry.data;
+      error = retry.error;
+    }
+
     if (error) {
       return { data: null, error: new Error(error.message) };
     }
-    return { data, error: null };
-  } catch (err: any) {
-    return { data: null, error: new Error(err.message || "Gagal memperbarui unit di Supabase") };
+    return { data: (data as SupabaseCarRow) || null, error: null };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Gagal memperbarui unit di Supabase";
+    return { data: null, error: new Error(message) };
   }
 }
 
@@ -262,8 +314,9 @@ export async function deleteCarFromSupabase(id: string): Promise<{ error: Error 
       return { error: new Error(error.message) };
     }
     return { error: null };
-  } catch (err: any) {
-    return { error: new Error(err.message || "Gagal menghapus unit dari Supabase") };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Gagal menghapus unit dari Supabase";
+    return { error: new Error(message) };
   }
 }
 
@@ -293,14 +346,15 @@ export async function fetchPortfoliosFromSupabase(): Promise<{ data: PortfolioIt
 
     const mapped = (res.data || []).map(mapRowToPortfolioItem);
     return { data: mapped, error: null };
-  } catch (err: any) {
-    return { data: [], error: new Error(err.message || "Failed to fetch portfolio") };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to fetch portfolio";
+    return { data: [], error: new Error(message) };
   }
 }
 
 export async function insertPortfolioToSupabase(
   formData: PortfolioFormData
-): Promise<{ data: any; error: Error | null }> {
+): Promise<{ data: SupabasePortfolioRow | null; error: Error | null }> {
   const payload = {
     title: formData.title,
     category: formData.category,
@@ -323,20 +377,21 @@ export async function insertPortfolioToSupabase(
       // Fallback try 'portfolios'
       const fallback = await supabase.from("portfolios").insert([payload]).select().single();
       if (!fallback.error) {
-        return { data: fallback.data, error: null };
+        return { data: (fallback.data as SupabasePortfolioRow) || null, error: null };
       }
       return { data: null, error: new Error(error.message) };
     }
-    return { data, error: null };
-  } catch (err: any) {
-    return { data: null, error: new Error(err.message || "Gagal menyimpan portofolio") };
+    return { data: (data as SupabasePortfolioRow) || null, error: null };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Gagal menyimpan portofolio";
+    return { data: null, error: new Error(message) };
   }
 }
 
 export async function updatePortfolioInSupabase(
   id: string,
   formData: PortfolioFormData
-): Promise<{ data: any; error: Error | null }> {
+): Promise<{ data: SupabasePortfolioRow | null; error: Error | null }> {
   const payload = {
     title: formData.title,
     category: formData.category,
@@ -353,13 +408,14 @@ export async function updatePortfolioInSupabase(
     if (error) {
       const fallback = await supabase.from("portfolios").update(payload).eq("id", id).select().single();
       if (!fallback.error) {
-        return { data: fallback.data, error: null };
+        return { data: (fallback.data as SupabasePortfolioRow) || null, error: null };
       }
       return { data: null, error: new Error(error.message) };
     }
-    return { data, error: null };
-  } catch (err: any) {
-    return { data: null, error: new Error(err.message || "Gagal memperbarui portofolio") };
+    return { data: (data as SupabasePortfolioRow) || null, error: null };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Gagal memperbarui portofolio";
+    return { data: null, error: new Error(message) };
   }
 }
 
@@ -374,7 +430,8 @@ export async function deletePortfolioFromSupabase(id: string): Promise<{ error: 
       return { error: new Error(error.message) };
     }
     return { error: null };
-  } catch (err: any) {
-    return { error: new Error(err.message || "Gagal menghapus portofolio") };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Gagal menghapus portofolio";
+    return { error: new Error(message) };
   }
 }

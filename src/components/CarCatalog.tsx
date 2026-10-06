@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ArrowUpRight, MessageCircle, Eye, Database, RefreshCw, AlertCircle, Car as CarIcon } from "lucide-react";
 import { CarUnit } from "../types";
-import { generateCarWhatsAppLink } from "../data/carsData";
+import { CARS_DATA, generateCarWhatsAppLink } from "../data/carsData";
 import { useSupabaseCars } from "../lib/useSupabaseData";
+
+const FALLBACK_CAR_IMAGE = "https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?q=80&w=1400&auto=format&fit=crop";
 
 interface CarCatalogProps {
   onSelectCar: (car: CarUnit) => void;
@@ -14,27 +16,37 @@ export default function CarCatalog({ onSelectCar }: CarCatalogProps) {
 
   const filterOptions = ["Semua", "Sedan", "SUV", "Low KM", "Executive"];
 
-  const filteredCars = cars.filter((car) => {
-    if (filter === "Semua") return true;
-    if (filter === "Sedan") {
-      return (
-        car.model.toLowerCase().includes("sedan") ||
-        car.name.toLowerCase().includes("civic") ||
-        car.name.toLowerCase().includes("bmw") ||
-        car.name.toLowerCase().includes("mercedes")
-      );
+  // Gracefully fallback to CARS_DATA if Supabase fetch failed or returned empty
+  const displayCars = useMemo(() => {
+    if (!loading && (error || cars.length === 0)) {
+      return CARS_DATA;
     }
-    if (filter === "SUV") {
-      return (
-        car.name.toLowerCase().includes("fortuner") ||
-        car.name.toLowerCase().includes("pajero") ||
-        car.name.toLowerCase().includes("hr-v")
-      );
-    }
-    if (filter === "Low KM") return car.mileage < 30000;
-    if (filter === "Executive") return car.badge === "EXECUTIVE" || car.badge === "LUXURY SEDAN";
-    return true;
-  });
+    return cars.length > 0 ? cars : CARS_DATA;
+  }, [cars, loading, error]);
+
+  const filteredCars = useMemo(() => {
+    return displayCars.filter((car) => {
+      if (filter === "Semua") return true;
+      if (filter === "Sedan") {
+        return (
+          car.model.toLowerCase().includes("sedan") ||
+          car.name.toLowerCase().includes("civic") ||
+          car.name.toLowerCase().includes("bmw") ||
+          car.name.toLowerCase().includes("mercedes")
+        );
+      }
+      if (filter === "SUV") {
+        return (
+          car.name.toLowerCase().includes("fortuner") ||
+          car.name.toLowerCase().includes("pajero") ||
+          car.name.toLowerCase().includes("hr-v")
+        );
+      }
+      if (filter === "Low KM") return car.mileage < 30000;
+      if (filter === "Executive") return car.badge === "EXECUTIVE" || car.badge === "LUXURY SEDAN";
+      return true;
+    });
+  }, [displayCars, filter]);
 
   return (
     <section
@@ -121,31 +133,30 @@ export default function CarCatalog({ onSelectCar }: CarCatalogProps) {
           </div>
         )}
 
-        {/* ERROR STATE */}
+        {/* SUBTLE FALLBACK BANNER IF SUPABASE ERROR */}
         {!loading && error && (
-          <div className="p-8 border border-red-900/40 bg-red-950/20 text-center my-6 max-w-xl mx-auto">
-            <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-            <h4 className="text-sm font-semibold uppercase tracking-wider text-white mb-1">
-              Gagal Memuat Katalog Dari Supabase
-            </h4>
-            <p className="text-xs text-neutral-400 mb-4">{error}</p>
+          <div className="mb-6 p-3.5 bg-amber-500/10 border border-amber-500/30 flex items-center justify-between flex-wrap gap-3 text-xs text-amber-200">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Menampilkan inventaris terverifikasi lokal (mode offline).</span>
+            </div>
             <button
               onClick={() => refetch()}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#D4AF37] text-black font-semibold text-xs tracking-wider uppercase cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-mono uppercase cursor-pointer transition-colors"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Coba Lagi</span>
+              <RefreshCw className="w-3 h-3" />
+              <span>Coba Hubungkan Lagi</span>
             </button>
           </div>
         )}
 
         {/* EMPTY STATE */}
-        {!loading && !error && filteredCars.length === 0 && (
+        {!loading && filteredCars.length === 0 && (
           <div className="p-12 border border-white/5 bg-[#141518] text-center my-6 max-w-xl mx-auto space-y-3">
             <CarIcon className="w-10 h-10 text-neutral-500 mx-auto" />
             <h4 className="text-base font-light text-white">Belum Ada Unit Mobil Tersedia</h4>
             <p className="text-xs text-neutral-400 max-w-sm mx-auto">
-              Saat ini belum ada unit pada kategori &quot;{filter}&quot; di database Supabase.
+              Saat ini belum ada unit pada kategori &quot;{filter}&quot;.
             </p>
             <div className="pt-2">
               <a
@@ -163,8 +174,8 @@ export default function CarCatalog({ onSelectCar }: CarCatalogProps) {
           </div>
         )}
 
-        {/* Grid of Cars from Supabase */}
-        {!loading && !error && filteredCars.length > 0 && (
+        {/* Grid of Cars */}
+        {!loading && filteredCars.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 lg:gap-10">
             {filteredCars.map((car) => {
               const waUrl = generateCarWhatsAppLink(car.name, car.formattedPrice);
@@ -180,10 +191,16 @@ export default function CarCatalog({ onSelectCar }: CarCatalogProps) {
                     onClick={() => onSelectCar(car)}
                   >
                     <img
-                      src={car.mainImage}
+                      src={car.mainImage || FALLBACK_CAR_IMAGE}
                       alt={car.name}
                       className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out"
                       loading="lazy"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (target.src !== FALLBACK_CAR_IMAGE) {
+                          target.src = FALLBACK_CAR_IMAGE;
+                        }
+                      }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#17181C] via-transparent to-black/30 pointer-events-none"></div>
 

@@ -1,8 +1,9 @@
 import { Edit3, Trash2, Car } from "lucide-react";
+import { CarUnit } from "../../types";
 
 interface AdminCarTableProps {
-  cars: any[];
-  onEdit: (car: any) => void;
+  cars: CarUnit[];
+  onEdit: (car: CarUnit) => void;
   onDelete: (id: string, name: string) => void;
 }
 

@@ -1,34 +1,6 @@
-export interface CarUnit {
-  id: string;
-  name: string;
-  brand: string;
-  model: string;
-  year: number;
-  price: number;
-  formattedPrice: string;
-  badge: string;
-  transmission: string;
-  mileage: number;
-  formattedMileage: string;
-  engine: string;
-  fuelType: string;
-  color: string;
-  taxStatus: string;
-  plate: string;
-  location: string;
-  mainImage: string;
-  gallery: {
-    title: string;
-    url: string;
-    tag: string;
-  }[];
-  description: string;
-  highlights: string[];
-  specs: {
-    label: string;
-    value: string;
-  }[];
-}
+import { CarUnit } from "../types";
+
+export type { CarUnit };
 
 export const CARS_DATA: CarUnit[] = [
   {

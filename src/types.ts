@@ -40,6 +40,8 @@ export interface SupabaseCarRow {
   description?: string;
   highlights?: string[] | string;
   gallery?: GalleryPhotoItem[] | string;
+  video_360_url?: string;
+  video360Url?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -66,10 +68,13 @@ export interface CarUnit {
   plate: string;
   location: string;
   mainImage: string;
+  main_image?: string;
   gallery: GalleryPhotoItem[];
   description: string;
   highlights: string[];
   specs: CarSpecItem[];
+  video360Url?: string;
+  video_360_url?: string;
 }
 
 /**
@@ -102,9 +107,12 @@ export interface PortfolioItem {
   title: string;
   subtitle: string;
   imageUrl: string;
+  image_url?: string;
   description: string;
   carModel: string;
+  car_model?: string;
   treatmentList: string[];
+  treatment_list?: string[];
 }
 
 export interface CarFormData {
@@ -126,6 +134,7 @@ export interface CarFormData {
   main_image: string;
   highlights: string[];
   gallery: GalleryPhotoItem[];
+  video_360_url?: string;
 }
 
 export interface PortfolioFormData {

@@ -1,8 +1,9 @@
 import { Edit3, Trash2, Layers } from "lucide-react";
+import { PortfolioItem } from "../../types";
 
 interface AdminPortfolioGridProps {
-  portfolios: any[];
-  onEdit: (item: any) => void;
+  portfolios: PortfolioItem[];
+  onEdit: (item: PortfolioItem) => void;
   onDelete: (id: string, title: string) => void;
 }
 

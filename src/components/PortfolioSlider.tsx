@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,8 +12,11 @@ import {
   Layers,
 } from "lucide-react";
 import { PortfolioItem } from "../types";
+import { PORTFOLIO_ITEMS } from "../data/portfolioData";
 import { generateServiceWhatsAppLink } from "../data/carsData";
 import { useSupabasePortfolios } from "../lib/useSupabaseData";
+
+const FALLBACK_PORTFOLIO_IMAGE = "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?q=80&w=1200&auto=format&fit=crop";
 
 interface PortfolioSliderProps {
   onOpenBookingWithService?: (serviceName: string) => void;
@@ -34,10 +37,18 @@ export default function PortfolioSlider({ onOpenBookingWithService }: PortfolioS
     "Interior & Mesin",
   ];
 
-  const filteredItems =
-    selectedCategory === "Semua"
-      ? portfolios
-      : portfolios.filter((item) => item.category === selectedCategory);
+  // Gracefully fallback to PORTFOLIO_ITEMS if Supabase fetch failed or returned empty
+  const displayPortfolios = useMemo(() => {
+    if (!loading && (error || portfolios.length === 0)) {
+      return PORTFOLIO_ITEMS;
+    }
+    return portfolios.length > 0 ? portfolios : PORTFOLIO_ITEMS;
+  }, [portfolios, loading, error]);
+
+  const filteredItems = useMemo(() => {
+    if (selectedCategory === "Semua") return displayPortfolios;
+    return displayPortfolios.filter((item) => item.category === selectedCategory);
+  }, [displayPortfolios, selectedCategory]);
 
   // Scroll to slide
   const scrollToSlide = (index: number) => {
@@ -184,37 +195,36 @@ export default function PortfolioSlider({ onOpenBookingWithService }: PortfolioS
           </div>
         )}
 
-        {/* ERROR STATE */}
+        {/* SUBTLE FALLBACK BANNER IF SUPABASE ERROR */}
         {!loading && error && (
-          <div className="p-8 border border-red-900/40 bg-red-950/20 text-center my-6 max-w-xl mx-auto">
-            <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-            <h4 className="text-sm font-semibold uppercase tracking-wider text-white mb-1">
-              Gagal Memuat Galeri Portofolio
-            </h4>
-            <p className="text-xs text-neutral-400 mb-4">{error}</p>
+          <div className="mb-6 p-3.5 bg-amber-500/10 border border-amber-500/30 flex items-center justify-between flex-wrap gap-3 text-xs text-amber-200">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Menampilkan galeri portofolio terverifikasi (mode cadangan).</span>
+            </div>
             <button
               onClick={() => refetch()}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#D4AF37] text-black font-semibold text-xs tracking-wider uppercase cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-mono uppercase cursor-pointer transition-colors"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Coba Lagi</span>
+              <RefreshCw className="w-3 h-3" />
+              <span>Sinkronkan Ulang</span>
             </button>
           </div>
         )}
 
         {/* EMPTY STATE */}
-        {!loading && !error && filteredItems.length === 0 && (
+        {!loading && filteredItems.length === 0 && (
           <div className="p-12 border border-white/5 bg-[#141518] text-center my-6 max-w-xl mx-auto space-y-3">
             <Layers className="w-10 h-10 text-neutral-500 mx-auto" />
             <h4 className="text-base font-light text-white">Belum Ada Portofolio Tersedia</h4>
             <p className="text-xs text-neutral-400 max-w-sm mx-auto">
-              Portofolio pada kategori &quot;{selectedCategory}&quot; belum terisi di database Supabase.
+              Portofolio pada kategori &quot;{selectedCategory}&quot; belum terisi.
             </p>
           </div>
         )}
 
         {/* Horizontal Slider / Carousel Container */}
-        {!loading && !error && filteredItems.length > 0 && (
+        {!loading && filteredItems.length > 0 && (
           <>
             <div
               ref={sliderRef}
@@ -230,10 +240,16 @@ export default function PortfolioSlider({ onOpenBookingWithService }: PortfolioS
                 >
                   {/* Background Image */}
                   <img
-                    src={item.imageUrl}
+                    src={item.imageUrl || FALLBACK_PORTFOLIO_IMAGE}
                     alt={item.title}
                     className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out"
                     loading="lazy"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (target.src !== FALLBACK_PORTFOLIO_IMAGE) {
+                        target.src = FALLBACK_PORTFOLIO_IMAGE;
+                      }
+                    }}
                   />
 
                   {/* Gradient Scrim Overlay for Contrast */}
@@ -307,9 +323,15 @@ export default function PortfolioSlider({ onOpenBookingWithService }: PortfolioS
             {/* Modal Image Header */}
             <div className="relative h-56 sm:h-72 md:h-80 w-full overflow-hidden shrink-0">
               <img
-                src={activeItem.imageUrl}
+                src={activeItem.imageUrl || FALLBACK_PORTFOLIO_IMAGE}
                 alt={activeItem.title}
                 className="w-full h-full object-cover object-center"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (target.src !== FALLBACK_PORTFOLIO_IMAGE) {
+                    target.src = FALLBACK_PORTFOLIO_IMAGE;
+                  }
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#17181C] via-transparent to-black/30"></div>
               <div className="absolute bottom-3 left-4 right-4 sm:bottom-4 sm:left-6 sm:right-6">
@@ -343,7 +365,7 @@ export default function PortfolioSlider({ onOpenBookingWithService }: PortfolioS
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
                   {activeItem.treatmentList.map((treatment, idx) => (
                     <li
-                      key={idx}
+                      key={`${treatment}-${idx}`}
                       className="text-xs text-neutral-300 flex items-start gap-2 bg-[#121215] p-2 sm:p-2.5 border border-white/5"
                     >
                       <Sparkles className="w-4 h-4 text-[#D4AF37] shrink-0 mt-0.5" />

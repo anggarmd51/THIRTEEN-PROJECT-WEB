@@ -16,11 +16,14 @@ import {
   Share2
 } from "lucide-react";
 import { CarUnit, generateCarWhatsAppLink } from "../data/carsData";
+import Car360Viewer from "./Car360Viewer";
 
 interface CarDetailModalProps {
   car: CarUnit | null;
   onClose: () => void;
 }
+
+const FALLBACK_CAR_IMAGE = "https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?q=80&w=1400&auto=format&fit=crop";
 
 export default function CarDetailModal({ car, onClose }: CarDetailModalProps) {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
@@ -71,11 +74,28 @@ export default function CarDetailModal({ car, onClose }: CarDetailModalProps) {
     setActivePhotoIndex((prev) => (prev < car.gallery.length - 1 ? prev + 1 : 0));
   };
 
-  const handleCopyShare = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
+  const handleShare = async () => {
+    const currentUrl = window.location.href; // Deep link URL
+    const shareText = `Cek unit pilihan di Thirteen Project:\n\n${car.name}\nHarga: Rp ${car.price.toLocaleString('id-ID')}\n\n${car.description}\n\nLihat selengkapnya:`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: car.name,
+          text: shareText,
+          url: currentUrl
+        });
+      } catch {
+        // User aborted the share dialog or device share failed
+      }
+    } else {
+      // Fallback: Copy to clipboard
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(`${shareText} ${currentUrl}`);
+      }
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
+      alert("Link berhasil disalin!");
     }
   };
 
@@ -108,7 +128,7 @@ export default function CarDetailModal({ car, onClose }: CarDetailModalProps) {
 
           <div className="flex items-center gap-1 sm:gap-2">
             <button
-              onClick={handleCopyShare}
+              onClick={handleShare}
               title="Bagikan Unit Mobil"
               className="min-w-[44px] min-h-[44px] p-2 text-neutral-400 hover:text-[#D4AF37] transition-colors text-xs flex items-center justify-center gap-1 cursor-pointer"
             >
@@ -132,16 +152,22 @@ export default function CarDetailModal({ car, onClose }: CarDetailModalProps) {
             {/* Main Active Photo */}
             <div className="relative h-[280px] sm:h-[420px] lg:h-[480px] w-full overflow-hidden flex items-center justify-center">
               <img
-                src={car.gallery[activePhotoIndex].url}
-                alt={`${car.name} - ${car.gallery[activePhotoIndex].title}`}
+                src={car.gallery[activePhotoIndex]?.url || car.mainImage || FALLBACK_CAR_IMAGE}
+                alt={`${car.name} - ${car.gallery[activePhotoIndex]?.title || car.name}`}
                 className="w-full h-full object-cover object-center transition-all duration-300"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (target.src !== FALLBACK_CAR_IMAGE) {
+                    target.src = FALLBACK_CAR_IMAGE;
+                  }
+                }}
               />
 
               {/* Photo Overlay Badges */}
               <div className="absolute inset-0 bg-gradient-to-t from-[#15161A] via-transparent to-black/30 pointer-events-none"></div>
 
               <div className="absolute top-4 left-4 z-10 bg-black/60 backdrop-blur-sm border border-white/10 px-3 py-1 text-xs text-neutral-300">
-                <span>{car.gallery[activePhotoIndex].tag}</span>: {car.gallery[activePhotoIndex].title}
+                <span>{car.gallery[activePhotoIndex]?.tag || "Foto"}</span>: {car.gallery[activePhotoIndex]?.title || car.name}
               </div>
 
               <div className="absolute top-4 right-4 z-10 bg-black/60 backdrop-blur-sm border border-white/10 px-3 py-1 text-xs font-mono text-[#D4AF37]">
@@ -169,7 +195,7 @@ export default function CarDetailModal({ car, onClose }: CarDetailModalProps) {
             <div className="flex gap-2 p-3 bg-[#0F0F11] border-t border-[#23262D] overflow-x-auto no-scrollbar">
               {car.gallery.map((img, idx) => (
                 <button
-                  key={idx}
+                  key={`${img.url || img.title}-${idx}`}
                   onClick={() => setActivePhotoIndex(idx)}
                   className={`relative shrink-0 w-20 sm:w-24 h-14 sm:h-16 overflow-hidden border-2 transition-all cursor-pointer ${
                     activePhotoIndex === idx
@@ -178,9 +204,15 @@ export default function CarDetailModal({ car, onClose }: CarDetailModalProps) {
                   }`}
                 >
                   <img
-                    src={img.url}
+                    src={img.url || FALLBACK_CAR_IMAGE}
                     alt={img.title}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (target.src !== FALLBACK_CAR_IMAGE) {
+                        target.src = FALLBACK_CAR_IMAGE;
+                      }
+                    }}
                   />
                   <span className="absolute bottom-0 left-0 right-0 bg-black/70 text-[9px] text-center text-neutral-300 py-0.5 truncate px-1">
                     {img.tag}
@@ -285,43 +317,47 @@ export default function CarDetailModal({ car, onClose }: CarDetailModalProps) {
               </div>
             </div>
 
-            {/* Description & Guarantee Guarantee */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-7 space-y-4">
-                <h4 className="text-xs font-semibold tracking-[0.25em] text-[#D4AF37] uppercase">
-                  DESKRIPSI KONDISI MOBIL
-                </h4>
-                <p className="text-sm text-neutral-300 font-light leading-relaxed">
-                  {car.description}
-                </p>
+            {/* DESKRIPSI KONDISI MOBIL */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-semibold tracking-[0.25em] text-[#D4AF37] uppercase">
+                DESKRIPSI KONDISI MOBIL
+              </h4>
+              <p className="text-sm text-neutral-300 font-light leading-relaxed">
+                {car.description}
+              </p>
 
-                {/* 100% Quality Seal */}
-                <div className="p-4 bg-[#111215] border border-[#D4AF37]/30 flex items-center gap-3 mt-4">
-                  <ShieldCheck className="w-6 h-6 text-[#D4AF37] shrink-0" />
-                  <div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-white block">
-                      GARANSI STANDAR THIRTEEN PROJECT
-                    </span>
-                  </div>
+              {/* 100% Quality Seal */}
+              <div className="p-4 bg-[#111215] border border-[#D4AF37]/30 flex items-center gap-3 mt-4">
+                <ShieldCheck className="w-6 h-6 text-[#D4AF37] shrink-0" />
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-white block">
+                    GARANSI STANDAR THIRTEEN PROJECT
+                  </span>
                 </div>
               </div>
+            </div>
 
-              {/* Checklist Keunggulan */}
-              <div className="lg:col-span-5 space-y-4">
-                <h4 className="text-xs font-semibold tracking-[0.25em] text-[#D4AF37] uppercase">
-                  POIN KEUNGGULAN UNIT
-                </h4>
-                <div className="space-y-2.5">
-                  {car.highlights.map((point, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-start gap-2.5 text-xs text-neutral-300 bg-[#181A1E] p-2.5 border border-white/5"
-                    >
-                      <CheckCircle2 className="w-4 h-4 text-[#D4AF37] shrink-0 mt-0.5" />
-                      <span>{point}</span>
-                    </div>
-                  ))}
-                </div>
+            {/* 360° INTERACTIVE CAR VIEWER (VIDEO SCRUBBING) */}
+            <Car360Viewer
+              videoUrl={car.video_360_url || car.video360Url}
+              carName={car.name}
+            />
+
+            {/* POIN KEUNGGULAN UNIT */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-semibold tracking-[0.25em] text-[#D4AF37] uppercase">
+                POIN KEUNGGULAN UNIT
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {car.highlights.map((point, idx) => (
+                  <div
+                    key={`${point}-${idx}`}
+                    className="flex items-start gap-2.5 text-xs text-neutral-300 bg-[#181A1E] p-2.5 border border-white/5"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-[#D4AF37] shrink-0 mt-0.5" />
+                    <span>{point}</span>
+                  </div>
+                ))}
               </div>
             </div>
 

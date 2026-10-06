@@ -120,7 +120,7 @@ export default function AdminLogin() {
     try {
       await supabase.auth.signOut();
     } catch (err) {
-      console.warn("Supabase signout failed, clearing local:", err);
+      console.error("Supabase signout failed, clearing local:", err);
     }
     localStorage.removeItem("thirteen_admin_session");
     setSession(null);

@@ -12,10 +12,11 @@ import {
   ChevronRight,
   Loader2,
   Move,
+  Video,
 } from "lucide-react";
 import { CarFormData, GalleryPhotoItem } from "../../types";
 import { insertCarToSupabase, updateCarInSupabase } from "../../lib/supabaseDb";
-import { uploadCarImage } from "../../lib/storage";
+import { uploadCarImage, uploadCar360Video } from "../../lib/storage";
 
 export const GALLERY_SLOTS = [
   { id: 1, label: "Depan" },
@@ -73,15 +74,12 @@ interface AdminCarModalProps {
   newHighlightInput: string;
   setNewHighlightInput: (val: string) => void;
   isUploadingMain: boolean;
-  isUploadingGallery: boolean;
   submitting?: boolean;
   hasDraft?: boolean;
   onClose: () => void;
   onSubmit?: (e: React.FormEvent) => void;
   onSuccess?: () => void;
   onMainImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onGalleryUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onRemoveGalleryPhoto: (index: number) => void;
   onAddHighlight: () => void;
   onRemoveHighlight: (index: number) => void;
 }
@@ -113,6 +111,7 @@ const DEFAULT_RESET_DATA: CarFormData = {
     "Bukan Bekas Tabrakan & Bebas Banjir 100%",
   ],
   gallery: [],
+  video_360_url: "",
 };
 
 export default function AdminCarModal({
@@ -123,24 +122,22 @@ export default function AdminCarModal({
   newHighlightInput,
   setNewHighlightInput,
   isUploadingMain,
-  isUploadingGallery,
   submitting: externalSubmitting = false,
   hasDraft = false,
   onClose,
   onSubmit: externalOnSubmit,
   onSuccess,
   onMainImageUpload,
-  onGalleryUpload,
-  onRemoveGalleryPhoto,
   onAddHighlight,
   onRemoveHighlight,
 }: AdminCarModalProps) {
   const mainImageInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
   const batchInputRef = useRef<HTMLInputElement>(null);
   const singleSlotInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const video360InputRef = useRef<HTMLInputElement>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [internalLoading, setInternalLoading] = useState(false);
+  const [isUploadingVideo360, setIsUploadingVideo360] = useState(false);
 
   // 10-Slot Gallery States
   const [gallerySlots, setGallerySlots] = useState<(GalleryPhotoItem | null)[]>(() =>
@@ -218,9 +215,6 @@ export default function AdminCarModal({
     setUploadingSlotIndex(slotIndex);
     try {
       const result = await uploadCarImage(file, `cars/gallery`);
-      if (result.error) {
-        console.warn("[Upload Warning]", result.error);
-      }
       const updated = [...gallerySlots];
       updated[slotIndex] = {
         url: result.url,
@@ -228,9 +222,10 @@ export default function AdminCarModal({
         title: `${carFormData.name || "Unit"} - ${GALLERY_SLOTS[slotIndex].label}`,
       };
       syncSlotsToFormData(updated);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Slot Upload Error]", err);
-      alert(`Gagal mengunggah foto slot ${GALLERY_SLOTS[slotIndex].label}: ${err.message || "Kesalahan jaringan"}`);
+      const errMsg = err instanceof Error ? err.message : "Kesalahan jaringan";
+      alert(`Gagal mengunggah foto slot ${GALLERY_SLOTS[slotIndex].label}: ${errMsg}`);
     } finally {
       setUploadingSlotIndex(null);
       e.target.value = "";
@@ -318,6 +313,40 @@ export default function AdminCarModal({
     setDragOverIndex(null);
   };
 
+  // Upload Video 360° to bucket 'car-360-videos'
+  const handleVideo360Upload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.includes("mp4") && !file.name.toLowerCase().endsWith(".mp4")) {
+      alert("Format berkas harus berupa video .mp4");
+      e.target.value = "";
+      return;
+    }
+
+    setIsUploadingVideo360(true);
+    try {
+      const result = await uploadCar360Video(file, "cars/360");
+      if (result.error) {
+        alert(`Peringatan Upload Video: ${result.error}`);
+      } else {
+        alert("Video 360° berhasil diunggah ke storage bucket 'car-360-videos'!");
+      }
+
+      setCarFormData((prev) => ({
+        ...prev,
+        video_360_url: result.url,
+      }));
+    } catch (err: unknown) {
+      console.error("[Upload Video 360 Error]", err);
+      const errMsg = err instanceof Error ? err.message : "Kesalahan jaringan";
+      alert(`Gagal mengunggah video 360°: ${errMsg}`);
+    } finally {
+      setIsUploadingVideo360(false);
+      e.target.value = "";
+    }
+  };
+
   if (!isOpen) return null;
 
   const isSaving = internalLoading || externalSubmitting || isBatchUploading;
@@ -380,8 +409,8 @@ export default function AdminCarModal({
         // Hapus draft di localStorage
         try {
           localStorage.removeItem(CAR_DRAFT_KEY);
-        } catch (e) {
-          console.warn("[AdminCarModal] Gagal menghapus draft localStorage:", e);
+        } catch {
+          // Abaikan jika localStorage tidak tersedia
         }
 
         // Reset form data ke default
@@ -401,9 +430,9 @@ export default function AdminCarModal({
 
       // Tutup modal secara otomatis
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[AdminCarModal] Gagal menyimpan ke Supabase:", err);
-      const errMsg = err?.message || JSON.stringify(err) || "Terjadi kesalahan tidak terduga";
+      const errMsg = err instanceof Error ? err.message : String(err) || "Terjadi kesalahan tidak terduga";
       setValidationError("Gagal menyimpan ke database: " + errMsg);
       alert("Gagal menyimpan: " + errMsg);
     } finally {
@@ -995,6 +1024,111 @@ export default function AdminCarModal({
             </div>
           </div>
 
+          {/* SECTION: VIDEO 360° INTERAKTIF (WALKAROUND MP4) */}
+          <div className="p-4 bg-[#18191E] border border-white/5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Video className="w-4 h-4 text-[#D4AF37]" />
+                <span className="text-[11px] font-mono font-semibold tracking-wider text-[#D4AF37] uppercase block">
+                  3.5 FITUR VIDEO 360° (INTERACTIVE WALK-AROUND)
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-neutral-400">
+                Bucket Storage: <strong className="text-white">car-360-videos</strong>
+              </span>
+            </div>
+
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              Unggah video memutar keliling kendaraan (.mp4) untuk mengaktifkan fitur <strong>360° Interactive Scrubbing</strong>. Calon pembeli dapat menggeser layar ke kiri/kanan untuk memutar sudut pandang mobil seperti 3D interaktif.
+            </p>
+
+            <div className="space-y-3">
+              <input
+                ref={video360InputRef}
+                type="file"
+                accept="video/mp4,video/*"
+                onChange={handleVideo360Upload}
+                className="hidden"
+              />
+
+              <div className="flex flex-wrap gap-2.5 items-center">
+                <button
+                  type="button"
+                  disabled={isUploadingVideo360}
+                  onClick={() => video360InputRef.current?.click()}
+                  className="px-4 py-2.5 bg-[#D4AF37] hover:bg-[#e0be47] text-black font-mono font-semibold text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  {isUploadingVideo360 ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Mengunggah Video ke car-360-videos...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      <span>Unggah Video 360° (.MP4)</span>
+                    </>
+                  )}
+                </button>
+
+                {carFormData.video_360_url && (
+                  <button
+                    type="button"
+                    onClick={() => setCarFormData((prev) => ({ ...prev, video_360_url: "" }))}
+                    className="px-3 py-2 bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-500/30 text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Trash className="w-3.5 h-3.5" />
+                    <span>Hapus Video 360°</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Direct URL input fallback */}
+              <div>
+                <label className="block text-[10px] font-mono uppercase text-neutral-400 mb-1">
+                  Atau Input Langsung Public URL Video 360° (video_360_url):
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://.../video-360-walkaround.mp4"
+                  value={carFormData.video_360_url || ""}
+                  onChange={(e) => setCarFormData((prev) => ({ ...prev, video_360_url: e.target.value }))}
+                  className="w-full bg-[#121316] border border-white/10 px-3 py-2 text-xs text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:outline-none font-mono"
+                />
+              </div>
+
+              {/* Live Preview if video is set */}
+              {carFormData.video_360_url ? (
+                <div className="mt-2 border border-[#D4AF37]/30 bg-black/80 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-mono text-[#D4AF37] uppercase tracking-wider font-semibold">
+                      Preview Pemutar Video 360°:
+                    </span>
+                    <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5">
+                      Siap Ditampilkan di Modal Unit
+                    </span>
+                  </div>
+                  <div className="relative aspect-video max-h-56 overflow-hidden bg-black flex items-center justify-center border border-white/10">
+                    <video
+                      src={carFormData.video_360_url}
+                      controls
+                      playsInline
+                      muted
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <span className="text-[10px] font-mono text-neutral-400 break-all mt-2 block">
+                    URL: {carFormData.video_360_url}
+                  </span>
+                </div>
+              ) : (
+                <div className="p-3 bg-white/[0.02] border border-dashed border-white/10 text-neutral-500 text-xs font-mono">
+                  *Belum ada video 360° khusus. Sistem penampil akan menggunakan video demo preview bawaan jika kosong.
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* SECTION D: DESKRIPSI & POIN KEUNGGULAN (DYNAMIC LIST) */}
           <div className="p-4 bg-[#18191E] border border-white/5 space-y-4">
             <span className="text-[11px] font-mono font-semibold tracking-wider text-[#D4AF37] uppercase block">
@@ -1048,7 +1182,7 @@ export default function AdminCarModal({
               <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                 {carFormData.highlights.map((item, idx) => (
                   <div
-                    key={idx}
+                    key={`${item}-${idx}`}
                     className="flex items-center justify-between px-3 py-1.5 bg-[#121316] border border-white/5 text-xs text-neutral-300"
                   >
                     <span className="flex items-center gap-2">
