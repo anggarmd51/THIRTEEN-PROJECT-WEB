@@ -18,64 +18,64 @@ export default function Car360Viewer({
 }: Car360ViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const rafRef = useRef<number | null>(null);
+
+  // Direct DOM references for 60fps/120fps display updates without React re-render overhead
+  const degreeHeaderRef = useRef<HTMLSpanElement>(null);
+  const degreeWatermarkRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
 
   const activeVideoUrl = videoUrl && videoUrl.trim() ? videoUrl.trim() : FALLBACK_360_VIDEO_URL;
   const isFallback = !videoUrl || !videoUrl.trim();
 
   // State
-  const [duration, setDuration] = useState<number>(0);
-  const [currentTime, setCurrentTime] = useState<number>(0);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [isAutoSpinning, setIsAutoSpinning] = useState(false);
 
-  // Drag tracking refs
-  const dragStartXRef = useRef<number>(0);
-  const dragStartTimeRef = useRef<number>(0);
-  const isDraggingRef = useRef<boolean>(false);
+  // Performance & physics refs (managed inside requestAnimationFrame loop)
+  const isLoadedRef = useRef(false);
+  const durationRef = useRef(0);
+  const virtualTimeRef = useRef(0);
+  const targetTimeRef = useRef(0);
+  const velocityRef = useRef(0);
+  const isDraggingRef = useRef(false);
+  const isAutoSpinningRef = useRef(false);
+  const lastClientXRef = useRef(0);
+  const lastMoveTimeRef = useRef(0);
 
-  // Set target video time using requestAnimationFrame for ultra-smooth performance
-  const setVideoTimeTo = useCallback((targetTime: number) => {
-    if (!videoRef.current || !videoRef.current.duration) return;
-    const dur = videoRef.current.duration;
-    if (!isFinite(dur) || dur <= 0) return;
+  // Helper to directly update HUD displays (Degrees and Progress Track)
+  const updateDisplay = useCallback((time: number, dur: number) => {
+    if (dur <= 0) return;
+    const deg = Math.round((time / dur) * 360) % 360;
+    const pct = Math.min(100, Math.max(0, (time / dur) * 100));
 
-    // Wrap around smoothly 0..dur
-    let normalized = targetTime % dur;
-    if (normalized < 0) normalized += dur;
-
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
+    if (degreeHeaderRef.current) {
+      degreeHeaderRef.current.textContent = `${deg}°`;
     }
-
-    rafRef.current = requestAnimationFrame(() => {
-      if (videoRef.current) {
-        videoRef.current.currentTime = normalized;
-        setCurrentTime(normalized);
-      }
-    });
+    if (degreeWatermarkRef.current) {
+      degreeWatermarkRef.current.textContent = `ROTASI: ${deg}°`;
+    }
+    if (progressBarRef.current) {
+      progressBarRef.current.style.width = `${pct}%`;
+    }
   }, []);
 
-  // Update current time on video timeupdate (for auto-spin or standard seek)
-  const handleTimeUpdate = () => {
-    if (videoRef.current && !isDraggingRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-    }
-  };
-
+  // Metadata Loaded
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
       const dur = videoRef.current.duration;
       if (isFinite(dur) && dur > 0) {
-        setDuration(dur);
+        durationRef.current = dur;
+        virtualTimeRef.current = 0;
+        targetTimeRef.current = 0;
+        velocityRef.current = 0;
+        isLoadedRef.current = true;
         setIsLoaded(true);
         setHasError(false);
-        // Position at start
         videoRef.current.currentTime = 0;
-        setCurrentTime(0);
+        updateDisplay(0, dur);
       }
     }
   };
@@ -83,134 +83,210 @@ export default function Car360Viewer({
   const handleError = () => {
     setHasError(true);
     setIsLoaded(false);
+    isLoadedRef.current = false;
   };
 
-  // Drag Start (Mouse & Touch)
-  const startDrag = useCallback(
-    (clientX: number) => {
-      if (!videoRef.current || !isLoaded) return;
+  // Drag start
+  const startDrag = useCallback((clientX: number) => {
+    if (!videoRef.current || !isLoadedRef.current) return;
 
-      // Stop auto spin if user initiates manual drag
-      if (isAutoSpinning) {
-        videoRef.current.pause();
-        setIsAutoSpinning(false);
-      }
+    if (isAutoSpinningRef.current) {
+      setIsAutoSpinning(false);
+      isAutoSpinningRef.current = false;
+    }
 
-      isDraggingRef.current = true;
-      setIsDragging(true);
-      setHasInteracted(true);
-      dragStartXRef.current = clientX;
-      dragStartTimeRef.current = videoRef.current.currentTime;
-    },
-    [isLoaded, isAutoSpinning]
-  );
+    isDraggingRef.current = true;
+    setIsDragging(true);
+    setHasInteracted(true);
+    velocityRef.current = 0;
+    lastClientXRef.current = clientX;
+    lastMoveTimeRef.current = performance.now();
+  }, []);
 
-  // Drag Move (Mouse & Touch)
-  const moveDrag = useCallback(
-    (clientX: number) => {
-      if (!isDraggingRef.current || !videoRef.current || !containerRef.current) return;
+  // Drag move with velocity tracking
+  const moveDrag = useCallback((clientX: number) => {
+    if (!isDraggingRef.current || !containerRef.current) return;
 
-      const rect = containerRef.current.getBoundingClientRect();
-      const containerWidth = rect.width || 400;
-      const deltaX = clientX - dragStartXRef.current;
-      const dur = videoRef.current.duration;
+    const now = performance.now();
+    const dt = now - lastMoveTimeRef.current;
+    const deltaX = clientX - lastClientXRef.current;
 
-      if (!isFinite(dur) || dur <= 0) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const containerWidth = rect.width || 400;
+    const dur = durationRef.current;
 
-      // Dragging across the full container width scrubs through the entire 360-degree duration
-      // Drag right moves rotation forward, drag left moves backwards
+    if (dur > 0 && containerWidth > 0) {
+      // Dragging across the full container width scrubs through the entire 360 duration
       const timeOffset = (deltaX / containerWidth) * dur;
-      const targetTime = dragStartTimeRef.current + timeOffset;
+      targetTimeRef.current += timeOffset;
 
-      setVideoTimeTo(targetTime);
-    },
-    [setVideoTimeTo]
-  );
+      if (dt > 4) {
+        const instantVelocity = (timeOffset / dt) * 1000;
+        // Exponential moving average for smooth velocity
+        velocityRef.current = velocityRef.current * 0.35 + instantVelocity * 0.65;
+        lastMoveTimeRef.current = now;
+        lastClientXRef.current = clientX;
+      }
+    }
+  }, []);
 
-  // Drag End
+  // Drag end with inertia momentum
   const endDrag = useCallback(() => {
     if (isDraggingRef.current) {
       isDraggingRef.current = false;
       setIsDragging(false);
+
+      // Clamp inertia velocity to avoid endless wild spinning
+      const dur = durationRef.current;
+      const maxVelocity = dur * 2.5; // Max 2.5 rotations per second
+      velocityRef.current = Math.max(-maxVelocity, Math.min(maxVelocity, velocityRef.current));
     }
   }, []);
 
-  // Mouse Handlers
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    startDrag(e.clientX);
-  };
-
-  // Touch Handlers
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length > 0) {
-      startDrag(e.touches[0].clientX);
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length > 0) {
-      moveDrag(e.touches[0].clientX);
-    }
-  };
-
-  const handleTouchEnd = () => {
-    endDrag();
-  };
-
-  // Global window mouse events while dragging
+  // Native Touch Event Listeners on container with { passive: false } to prevent mobile vertical jitter
   useEffect(() => {
-    const handleGlobalMouseMove = (e: MouseEvent) => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        startDrag(e.touches[0].clientX);
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 1 && isDraggingRef.current) {
+        // Prevent vertical scrolling on the page when user is scrubbing horizontally
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+        moveDrag(e.touches[0].clientX);
+      }
+    };
+
+    const onTouchEnd = () => {
+      endDrag();
+    };
+
+    container.addEventListener("touchstart", onTouchStart, { passive: true });
+    container.addEventListener("touchmove", onTouchMove, { passive: false });
+    container.addEventListener("touchend", onTouchEnd, { passive: true });
+    container.addEventListener("touchcancel", onTouchEnd, { passive: true });
+
+    return () => {
+      container.removeEventListener("touchstart", onTouchStart);
+      container.removeEventListener("touchmove", onTouchMove);
+      container.removeEventListener("touchend", onTouchEnd);
+      container.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, [startDrag, moveDrag, endDrag]);
+
+  // Global Mouse listeners when dragging outside container bounds
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
       if (isDraggingRef.current) {
         moveDrag(e.clientX);
       }
     };
 
-    const handleGlobalMouseUp = () => {
+    const onMouseUp = () => {
       if (isDraggingRef.current) {
         endDrag();
       }
     };
 
-    window.addEventListener("mousemove", handleGlobalMouseMove);
-    window.addEventListener("mouseup", handleGlobalMouseUp);
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
 
     return () => {
-      window.removeEventListener("mousemove", handleGlobalMouseMove);
-      window.removeEventListener("mouseup", handleGlobalMouseUp);
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-      }
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
     };
   }, [moveDrag, endDrag]);
 
+  // Unified RequestAnimationFrame Loop: Lerp + Inertia + Auto-Spin
+  useEffect(() => {
+    let animId: number;
+    let lastTime = performance.now();
+
+    const loop = (now: number) => {
+      const rawDelta = (now - lastTime) / 1000;
+      const dt = Math.min(Math.max(rawDelta, 0.001), 0.1);
+      lastTime = now;
+
+      const dur = durationRef.current;
+      const video = videoRef.current;
+
+      if (dur > 0 && video && isLoadedRef.current) {
+        // 1. Auto Spin Mode
+        if (isAutoSpinningRef.current) {
+          // 1 complete rotation every 9 seconds
+          const spinSpeed = dur / 9;
+          targetTimeRef.current += spinSpeed * dt;
+          velocityRef.current = 0;
+        }
+        // 2. Inertia Momentum on Release
+        else if (!isDraggingRef.current && Math.abs(velocityRef.current) > 0.01) {
+          targetTimeRef.current += velocityRef.current * dt;
+          // Fluid friction decay per frame
+          const friction = Math.pow(0.91, dt * 60);
+          velocityRef.current *= friction;
+          if (Math.abs(velocityRef.current) < 0.01) {
+            velocityRef.current = 0;
+          }
+        }
+
+        // 3. Smooth Lerp Interpolation towards targetTime
+        const lerpFactor = isDraggingRef.current ? 0.32 : 0.2;
+        const t = 1 - Math.pow(1 - lerpFactor, dt * 60);
+        virtualTimeRef.current += (targetTimeRef.current - virtualTimeRef.current) * t;
+
+        // 4. Smooth cyclic wrap-around 0..dur
+        let normalizedTime = ((virtualTimeRef.current % dur) + dur) % dur;
+
+        // 5. Update HTML5 video currentTime smoothly
+        const diff = Math.abs(video.currentTime - normalizedTime);
+        if (diff > 0.015) {
+          video.currentTime = normalizedTime;
+        }
+
+        // 6. Direct DOM update for 60fps/120fps display without React re-render
+        updateDisplay(normalizedTime, dur);
+      }
+
+      animId = requestAnimationFrame(loop);
+    };
+
+    animId = requestAnimationFrame(loop);
+
+    return () => {
+      cancelAnimationFrame(animId);
+    };
+  }, [updateDisplay]);
+
   // Toggle Auto Spin
   const toggleAutoSpin = () => {
-    if (!videoRef.current) return;
     setHasInteracted(true);
-
-    if (isAutoSpinning) {
-      videoRef.current.pause();
-      setIsAutoSpinning(false);
-    } else {
-      videoRef.current.play().catch(() => {});
-      setIsAutoSpinning(true);
-    }
+    const next = !isAutoSpinning;
+    setIsAutoSpinning(next);
+    isAutoSpinningRef.current = next;
+    velocityRef.current = 0;
   };
 
-  // Reset rotation to 0°
+  // Reset to 0°
   const handleReset = () => {
-    if (!videoRef.current) return;
-    if (isAutoSpinning) {
-      videoRef.current.pause();
+    if (isAutoSpinningRef.current) {
       setIsAutoSpinning(false);
+      isAutoSpinningRef.current = false;
     }
-    setVideoTimeTo(0);
+    velocityRef.current = 0;
+    targetTimeRef.current = 0;
+    virtualTimeRef.current = 0;
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+    }
+    updateDisplay(0, durationRef.current);
   };
-
-  // Calculate current rotation degree (0° - 360°)
-  const rotationDegree = duration > 0 ? Math.round((currentTime / duration) * 360) % 360 : 0;
-  const progressRatio = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
     <div
@@ -231,8 +307,11 @@ export default function Car360Viewer({
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-xs font-mono font-semibold text-[#D4AF37]">
-            {rotationDegree}°
+          <span
+            ref={degreeHeaderRef}
+            className="text-xs font-mono font-semibold text-[#D4AF37]"
+          >
+            0°
           </span>
           <div className="flex items-center gap-1">
             <button
@@ -268,11 +347,10 @@ export default function Car360Viewer({
       {/* Main Interactive Scrubbing Area */}
       <div
         ref={containerRef}
-        onMouseDown={handleMouseDown}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          startDrag(e.clientX);
+        }}
         className={`relative w-full h-[260px] sm:h-[340px] md:h-[380px] bg-black flex items-center justify-center overflow-hidden cursor-ew-resize touch-none ${
           isDragging ? "cursor-grabbing" : "cursor-grab"
         }`}
@@ -288,7 +366,6 @@ export default function Car360Viewer({
           loop
           preload="auto"
           onLoadedMetadata={handleLoadedMetadata}
-          onTimeUpdate={handleTimeUpdate}
           onError={handleError}
           className="w-full h-full object-contain pointer-events-none select-none"
         />
@@ -329,7 +406,7 @@ export default function Car360Viewer({
         {isLoaded && !hasError && (
           <div
             className={`absolute inset-0 flex flex-col items-center justify-center pointer-events-none transition-opacity duration-700 z-10 ${
-              hasInteracted ? "opacity-0" : "opacity-100"
+              hasInteracted ? "opacity-0 pointer-events-none" : "opacity-100"
             }`}
           >
             <div className="bg-black/80 backdrop-blur-md border border-[#D4AF37]/50 px-5 py-3.5 shadow-2xl flex flex-col items-center gap-1.5 animate-pulse">
@@ -353,16 +430,20 @@ export default function Car360Viewer({
         </div>
 
         {/* Rotation Degree Compass Watermark */}
-        <div className="absolute top-3 right-3 pointer-events-none z-10 bg-black/60 backdrop-blur-sm border border-white/10 px-2 py-0.5 text-[10px] font-mono text-[#D4AF37]">
-          ROTASI: {rotationDegree}°
+        <div
+          ref={degreeWatermarkRef}
+          className="absolute top-3 right-3 pointer-events-none z-10 bg-black/60 backdrop-blur-sm border border-white/10 px-2 py-0.5 text-[10px] font-mono text-[#D4AF37]"
+        >
+          ROTASI: 0°
         </div>
       </div>
 
       {/* 360 Scrubbing Progress Track */}
       <div className="w-full bg-[#18191E] h-1.5 relative overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-[#B38F24] via-[#D4AF37] to-[#F1D779] transition-all duration-75"
-          style={{ width: `${progressRatio}%` }}
+          ref={progressBarRef}
+          className="h-full bg-gradient-to-r from-[#B38F24] via-[#D4AF37] to-[#F1D779] transition-none"
+          style={{ width: "0%" }}
         ></div>
       </div>
 

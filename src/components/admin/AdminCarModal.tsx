@@ -1083,20 +1083,6 @@ export default function AdminCarModal({
                 )}
               </div>
 
-              {/* Direct URL input fallback */}
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-neutral-400 mb-1">
-                  Atau Input Langsung Public URL Video 360° (video_360_url):
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://.../video-360-walkaround.mp4"
-                  value={carFormData.video_360_url || ""}
-                  onChange={(e) => setCarFormData((prev) => ({ ...prev, video_360_url: e.target.value }))}
-                  className="w-full bg-[#121316] border border-white/10 px-3 py-2 text-xs text-white placeholder:text-neutral-600 focus:border-[#D4AF37] focus:outline-none font-mono"
-                />
-              </div>
-
               {/* Live Preview if video is set */}
               {carFormData.video_360_url ? (
                 <div className="mt-2 border border-[#D4AF37]/30 bg-black/80 p-3">
@@ -1105,7 +1091,7 @@ export default function AdminCarModal({
                       Preview Pemutar Video 360°:
                     </span>
                     <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5">
-                      Siap Ditampilkan di Modal Unit
+                      Video 360° Siap Ditampilkan
                     </span>
                   </div>
                   <div className="relative aspect-video max-h-56 overflow-hidden bg-black flex items-center justify-center border border-white/10">
@@ -1117,9 +1103,6 @@ export default function AdminCarModal({
                       className="w-full h-full object-contain"
                     />
                   </div>
-                  <span className="text-[10px] font-mono text-neutral-400 break-all mt-2 block">
-                    URL: {carFormData.video_360_url}
-                  </span>
                 </div>
               ) : (
                 <div className="p-3 bg-white/[0.02] border border-dashed border-white/10 text-neutral-500 text-xs font-mono">
